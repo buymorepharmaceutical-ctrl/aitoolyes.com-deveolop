@@ -10,7 +10,7 @@ const nextConfig: import('next').NextConfig = {
   compress: true, // Enable Gzip/Brotli compression
   poweredByHeader: false, // Remove X-Powered-By
   reactStrictMode: true,
-  output: 'standalone',
+  // output: 'standalone', // Removed to fix Vercel 404 Not Found error
   turbopack: {},
   images: {
     remotePatterns: [
