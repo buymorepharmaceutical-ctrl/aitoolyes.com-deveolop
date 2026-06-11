@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Plus, X, Bot, User, Sparkles, Code, FileJson, Type, Hash, Settings, Search, MessageSquare, PlusCircle, Menu, Image as ImageIcon } from 'lucide-react';
 import { marked } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/lib/supabaseClient';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -43,8 +44,9 @@ export default function AIChat() {
   const [modelName, setModelName] = useState('gpt-4o');
   
   // Database States
-  const [chats, setChats] = useState<{id: number, title: string, created_at: string}[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<number | null>(null);
+  const [chats, setChats] = useState<{id: string, title: string, created_at: string}[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>('');
 
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +74,14 @@ export default function AIChat() {
 
   // Load chats and settings on mount
   useEffect(() => {
-    fetchChats();
+    let sId = localStorage.getItem('ai_session_id');
+    if (!sId) {
+      sId = crypto.randomUUID();
+      localStorage.setItem('ai_session_id', sId);
+    }
+    setSessionId(sId);
+    fetchChats(sId);
+    
     const storedApiKey = localStorage.getItem('ai_api_key');
     const storedBaseUrl = localStorage.getItem('ai_base_url');
     const storedModelName = localStorage.getItem('ai_model_name');
@@ -81,22 +90,32 @@ export default function AIChat() {
     if (storedModelName) setModelName(storedModelName);
   }, []);
 
-  const fetchChats = () => {
+  const fetchChats = async (sId: string) => {
     try {
-      const storedChats = JSON.parse(localStorage.getItem('ai_chats') || '[]');
-      setChats(storedChats);
+      const { data, error } = await supabase
+        .from('ai_chats')
+        .select('id, title, created_at')
+        .eq('session_id', sId)
+        .order('created_at', { ascending: false });
+      if (data) setChats(data as any);
     } catch(e) {
       console.error("Failed to load history", e);
     }
   };
 
-  const loadChat = (id: number) => {
+  const loadChat = async (id: string) => {
     setCurrentChatId(id);
     setIsLoading(true);
     try {
-      const storedMessages = JSON.parse(localStorage.getItem(`ai_chat_${id}`) || '[]');
-      if(storedMessages && storedMessages.length > 0) {
-        setMessages(storedMessages);
+      const { data, error } = await supabase
+        .from('ai_messages')
+        .select('role, content, image')
+        .eq('chat_id', id)
+        .order('created_at', { ascending: true });
+      if(data && data.length > 0) {
+        setMessages(data as Message[]);
+      } else {
+        setMessages([{ role: 'assistant', content: 'Hello! I am your Universal Agentic AI. You can chat with me normally, or click the **+** button to select a specific tool and I will execute it for you!' }]);
       }
     } catch(e) {
       console.error(e);
@@ -129,15 +148,24 @@ export default function AIChat() {
 
     let activeChatId = currentChatId;
     
-    // Create new chat in LocalStorage if it doesn't exist
+    // Create new chat in Supabase if it doesn't exist
     if (!activeChatId) {
-      activeChatId = Date.now();
+      activeChatId = crypto.randomUUID();
       setCurrentChatId(activeChatId);
-      const newChatMeta = { id: activeChatId, title: userContent.substring(0, 30) + '...', created_at: new Date().toISOString() };
-      const existingChats = JSON.parse(localStorage.getItem('ai_chats') || '[]');
-      localStorage.setItem('ai_chats', JSON.stringify([newChatMeta, ...existingChats]));
-      fetchChats();
+      const newChatTitle = userContent.substring(0, 30) + '...';
+      const newChatMeta = { id: activeChatId, title: newChatTitle, session_id: sessionId };
+      setChats([newChatMeta as any, ...chats]);
+      
+      await supabase.from('ai_chats').insert(newChatMeta);
     }
+
+    // Save User message
+    await supabase.from('ai_messages').insert({
+      chat_id: activeChatId,
+      role: 'user',
+      content: userContent,
+      image: attachedImage
+    });
 
     try {
       const payloadMessages = [];
@@ -165,9 +193,13 @@ export default function AIChat() {
       const finalMessages = [...newMessages, { role: 'assistant', content: data.response }] as Message[];
       setMessages(finalMessages);
       
-      // Save full chat history to localStorage
+      // Save full chat history to Supabase
       if (activeChatId) {
-        localStorage.setItem(`ai_chat_${activeChatId}`, JSON.stringify(finalMessages));
+        await supabase.from('ai_messages').insert({
+          chat_id: activeChatId,
+          role: 'assistant',
+          content: data.response
+        });
       }
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error connecting to the AI backend. Please check your API keys.' }]);
