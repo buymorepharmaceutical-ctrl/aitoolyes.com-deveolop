@@ -34,6 +34,12 @@ export default function AIChat() {
   const [selectedTool, setSelectedTool] = useState<ToolContext | null>(null);
   const [showToolMenu, setShowToolMenu] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  // API Settings
+  const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('https://api.openai.com/v1');
+  const [modelName, setModelName] = useState('gpt-4o');
   
   // Database States
   const [chats, setChats] = useState<{id: number, title: string, created_at: string}[]>([]);
@@ -49,9 +55,15 @@ export default function AIChat() {
     scrollToBottom();
   }, [messages]);
 
-  // Load chats on mount
+  // Load chats and settings on mount
   useEffect(() => {
     fetchChats();
+    const storedApiKey = localStorage.getItem('ai_api_key');
+    const storedBaseUrl = localStorage.getItem('ai_base_url');
+    const storedModelName = localStorage.getItem('ai_model_name');
+    if (storedApiKey) setApiKey(storedApiKey);
+    if (storedBaseUrl) setBaseUrl(storedBaseUrl);
+    if (storedModelName) setModelName(storedModelName);
   }, []);
 
   const fetchChats = () => {
@@ -81,6 +93,13 @@ export default function AIChat() {
   const startNewChat = () => {
     setCurrentChatId(null);
     setMessages([{ role: 'assistant', content: 'Hello! I am your Universal Agentic AI. How can I help you today?' }]);
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem('ai_api_key', apiKey);
+    localStorage.setItem('ai_base_url', baseUrl);
+    localStorage.setItem('ai_model_name', modelName);
+    setShowSettings(false);
   };
 
   const handleSend = async () => {
@@ -119,7 +138,8 @@ export default function AIChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: payloadMessages
+          messages: payloadMessages,
+          apiConfig: apiKey ? { apiKey, baseUrl, modelName } : null
         }),
       });
 
@@ -230,9 +250,16 @@ export default function AIChat() {
             </motion.div>
             <div>
               <h1 className="font-bold text-lg text-foreground leading-tight">AI ToolYes</h1>
-              <p className="text-xs text-foreground/60">Powered by Cloud Engine</p>
+              <p className="text-xs text-foreground/60">{apiKey ? `Powered by ${modelName}` : 'Powered by Cloud Engine'}</p>
             </div>
           </div>
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="p-2 text-foreground/60 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+            title="API Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Chat Area */}
@@ -378,6 +405,95 @@ export default function AIChat() {
           </div>
         </div>
       </motion.div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">API Configuration</h2>
+                  <p className="text-sm text-gray-500">Bring Your Own Key (BYOK)</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">API Key</label>
+                  <input 
+                    type="password" 
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Stored locally in your browser.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Base URL (For Local/Ollama/DeepSeek)</label>
+                  <input 
+                    type="text" 
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    placeholder="https://api.openai.com/v1"
+                    className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Model Name</label>
+                  <input 
+                    type="text" 
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    placeholder="gpt-4o"
+                    className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3">
+                  <button 
+                    onClick={() => {
+                      setApiKey('');
+                      setBaseUrl('https://api.openai.com/v1');
+                      setModelName('gpt-4o');
+                      localStorage.removeItem('ai_api_key');
+                      localStorage.removeItem('ai_base_url');
+                      localStorage.removeItem('ai_model_name');
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-red-600 transition-colors"
+                  >
+                    Clear Keys
+                  </button>
+                  <button 
+                    onClick={saveSettings}
+                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
