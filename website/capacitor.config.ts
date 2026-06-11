@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'AI ToolYes',
   webDir: 'public',
   server: {
-    url: 'http://192.168.100.72:4000',
+    url: 'https://aitoolyes.com',
     cleartext: true
   }
 };
