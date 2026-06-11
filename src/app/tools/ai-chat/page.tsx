@@ -1,12 +1,13 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { Send, Plus, X, Bot, User, Sparkles, Code, FileJson, Type, Hash, Settings, Search, MessageSquare, PlusCircle, Menu } from 'lucide-react';
+import { Send, Plus, X, Bot, User, Sparkles, Code, FileJson, Type, Hash, Settings, Search, MessageSquare, PlusCircle, Menu, Image as ImageIcon } from 'lucide-react';
 import { marked } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  image?: string;
 }
 
 interface ToolContext {
@@ -45,7 +46,21 @@ export default function AIChat() {
   const [chats, setChats] = useState<{id: number, title: string, created_at: string}[]>([]);
   const [currentChatId, setCurrentChatId] = useState<number | null>(null);
 
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setAttachedImage(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,12 +118,13 @@ export default function AIChat() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() && !selectedTool) return;
+    if (!input.trim() && !selectedTool && !attachedImage) return;
     
     const userContent = input.trim();
-    const newMessages = [...messages, { role: 'user', content: userContent }] as Message[];
+    const newMessages = [...messages, { role: 'user', content: userContent, image: attachedImage }] as Message[];
     setMessages(newMessages);
     setInput('');
+    setAttachedImage(null);
     setIsLoading(true);
 
     let activeChatId = currentChatId;
@@ -285,7 +301,10 @@ export default function AIChat() {
                     : 'bg-white border border-card-border shadow-sm rounded-tl-none'
                 }`}>
                   {msg.role === 'user' ? (
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    <div className="flex flex-col gap-2">
+                      {msg.image && <img src={msg.image} alt="User upload" className="max-w-sm rounded-lg shadow-sm border border-black/10" />}
+                      {msg.content && <p className="text-sm whitespace-pre-wrap">{msg.content}</p>}
+                    </div>
                   ) : (
                     <div 
                       className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:p-4 prose-pre:rounded-xl"
@@ -362,20 +381,41 @@ export default function AIChat() {
               )}
             </AnimatePresence>
 
-            <div className="flex items-end gap-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowToolMenu(!showToolMenu)}
-                className={`p-3 rounded-xl flex-shrink-0 transition-colors ${
-                  showToolMenu || selectedTool 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'bg-white border border-card-border text-foreground/60 hover:bg-gray-50'
-                }`}
-                title="Attach Tool Capability"
-              >
-                <Plus className={`w-5 h-5 transition-transform ${showToolMenu ? 'rotate-45' : ''}`} />
-              </motion.button>
+              <div className="flex flex-col gap-2">
+                <AnimatePresence>
+                  {attachedImage && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="relative w-24 h-24">
+                      <img src={attachedImage} className="w-full h-full object-cover rounded-xl border-2 border-indigo-200 shadow-md" />
+                      <button onClick={() => setAttachedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform"><X className="w-3 h-3" /></button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                <div className="flex items-end gap-2">
+                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-3 rounded-xl flex-shrink-0 bg-white border border-card-border text-foreground/60 hover:bg-gray-50 transition-colors shadow-sm"
+                    title="Upload Image"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowToolMenu(!showToolMenu)}
+                    className={`p-3 rounded-xl flex-shrink-0 transition-colors ${
+                      showToolMenu || selectedTool 
+                        ? 'bg-indigo-600 text-white shadow-md' 
+                        : 'bg-white border border-card-border text-foreground/60 hover:bg-gray-50'
+                    }`}
+                    title="Attach Tool Capability"
+                  >
+                    <Plus className={`w-5 h-5 transition-transform ${showToolMenu ? 'rotate-45' : ''}`} />
+                  </motion.button>
               
               <div className="flex-1 bg-white border border-card-border rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 transition-all flex items-end">
                 <textarea
@@ -401,6 +441,7 @@ export default function AIChat() {
                   <Send className="w-4 h-4" />
                 </motion.button>
               </div>
+            </div>
             </div>
           </div>
         </div>

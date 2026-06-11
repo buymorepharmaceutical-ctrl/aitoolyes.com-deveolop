@@ -104,7 +104,21 @@ async function fetchFromOpenRouter(messages: any[], model: string, apiKey: strin
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    let messages = body.messages || [];
+    let rawMessages = body.messages || [];
+    let messages = rawMessages.map((msg: any) => {
+      if (msg.image) {
+        // Format for Vision Models
+        return {
+          role: msg.role,
+          content: [
+            { type: "text", text: msg.content },
+            { type: "image_url", image_url: { url: msg.image } }
+          ]
+        };
+      }
+      // Standard message
+      return { role: msg.role, content: msg.content };
+    });
     const apiConfig = body.apiConfig; // { apiKey, baseUrl, modelName }
 
     let responseData;

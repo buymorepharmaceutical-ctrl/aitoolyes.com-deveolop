@@ -35,22 +35,16 @@ export default function BackgroundRemover() {
     setError('');
     
     try {
-      // Extract base64 part from data URL
-      const base64Data = originalImage.split(',')[1];
+      const { removeBackground } = await import('@imgly/background-removal');
       
-      const res = await fetch('/api/ai/remove-background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: base64Data }),
+      const blob = await removeBackground(originalImage, {
+        progress: (key, current, total) => {
+          console.log(`Downloading model: ${key} - ${current}/${total}`);
+        }
       });
       
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to remove background');
-      }
-      
-      // The backend returns raw base64 string, we need to prepend data URI scheme
-      setResultImage(`data:image/png;base64,${data.output}`);
+      const url = URL.createObjectURL(blob);
+      setResultImage(url);
     } catch (err: unknown) {
       const errorObj = err as Error;
       setError(errorObj.message || 'An unexpected error occurred while processing the image.');

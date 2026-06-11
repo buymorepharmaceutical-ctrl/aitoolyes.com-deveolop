@@ -69,21 +69,12 @@ export default function CamScanner() {
     if (!processedImage) return;
     setIsBgRemoving(true);
     try {
-      const base64Data = processedImage.split(',')[1];
-      const response = await fetch('http://localhost:8000/api/ai/remove-background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: base64Data })
-      });
-      const data = await response.json();
-      if (data.success && data.output) {
-        setProcessedImage(`data:image/png;base64,${data.output}`);
-      } else {
-        alert('AI Background removal failed or rembg is not installed on the server.');
-      }
+      const { removeBackground: imglyRemoveBackground } = await import('@imgly/background-removal');
+      const blob = await imglyRemoveBackground(processedImage);
+      setProcessedImage(URL.createObjectURL(blob));
     } catch (error) {
       console.error('BG Remove Error:', error);
-      alert('Failed to connect to the AI Backend. Ensure it is running on port 8000.');
+      alert('Failed to remove background using ML model.');
     } finally {
       setIsBgRemoving(false);
     }
