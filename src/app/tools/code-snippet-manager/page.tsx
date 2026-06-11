@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 import { Code2, Plus, Trash2, Save, Search, Hash, Copy, Check } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 interface Snippet {
   id: string;
@@ -18,27 +19,40 @@ export default function CodeSnippetManager() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
 
   // Load snippets on mount
   useEffect(() => {
-    const saved = localStorage.getItem('eloxon-snippets');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setSnippets(parsed);
-      if (parsed.length > 0) setActiveId(parsed[0].id);
+    let sId = localStorage.getItem('ai_session_id');
+    if (!sId) {
+      sId = crypto.randomUUID();
+      localStorage.setItem('ai_session_id', sId);
     }
+    setSessionId(sId);
+    
+    const fetchSnippets = async () => {
+      const { data, error } = await supabase
+        .from('code_snippets')
+        .select('*')
+        .eq('session_id', sId)
+        .order('last_modified', { ascending: false });
+        
+      if (data && data.length > 0) {
+        const formattedData = data.map(d => ({
+          ...d,
+          lastModified: new Date(d.last_modified).getTime()
+        }));
+        setSnippets(formattedData);
+        setActiveId(formattedData[0].id);
+      }
+    };
+    fetchSnippets();
   }, []);
-
-  // Save to local storage whenever snippets change
-  const saveToStorage = (newSnippets: Snippet[]) => {
-    setSnippets(newSnippets);
-    localStorage.setItem('eloxon-snippets', JSON.stringify(newSnippets));
-  };
 
   const activeSnippet = snippets.find(s => s.id === activeId);
 
-  const createNewSnippet = () => {
-    const newId = Date.now().toString();
+  const createNewSnippet = async () => {
+    const newId = crypto.randomUUID();
     const newSnippet: Snippet = {
       id: newId,
       title: 'Untitled Snippet',
@@ -47,24 +61,51 @@ export default function CodeSnippetManager() {
       tags: [],
       lastModified: Date.now()
     };
-    saveToStorage([newSnippet, ...snippets]);
+    
+    setSnippets([newSnippet, ...snippets]);
     setActiveId(newId);
+    
+    await supabase.from('code_snippets').insert({
+      id: newId,
+      session_id: sessionId,
+      title: newSnippet.title,
+      code: newSnippet.code,
+      language: newSnippet.language,
+      tags: newSnippet.tags,
+      last_modified: new Date(newSnippet.lastModified).toISOString()
+    });
   };
 
-  const updateActiveSnippet = (updates: Partial<Snippet>) => {
+  const updateActiveSnippet = async (updates: Partial<Snippet>) => {
     if (!activeId) return;
-    const newSnippets = snippets.map(s => 
-      s.id === activeId ? { ...s, ...updates, lastModified: Date.now() } : s
-    );
-    saveToStorage(newSnippets);
+    
+    const existingIndex = snippets.findIndex(s => s.id === activeId);
+    if (existingIndex === -1) return;
+
+    const updatedSnippet = { ...snippets[existingIndex], ...updates, lastModified: Date.now() };
+    const newSnippets = [...snippets];
+    newSnippets[existingIndex] = updatedSnippet;
+    
+    setSnippets(newSnippets);
+    
+    await supabase.from('code_snippets')
+      .update({
+        title: updatedSnippet.title,
+        code: updatedSnippet.code,
+        language: updatedSnippet.language,
+        tags: updatedSnippet.tags,
+        last_modified: new Date(updatedSnippet.lastModified).toISOString()
+      })
+      .eq('id', activeId);
   };
 
-  const deleteSnippet = (id: string) => {
+  const deleteSnippet = async (id: string) => {
     const newSnippets = snippets.filter(s => s.id !== id);
-    saveToStorage(newSnippets);
+    setSnippets(newSnippets);
     if (activeId === id) {
       setActiveId(newSnippets.length > 0 ? newSnippets[0].id : null);
     }
+    await supabase.from('code_snippets').delete().eq('id', id);
   };
 
   const handleCopy = async () => {

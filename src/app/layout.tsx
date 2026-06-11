@@ -50,6 +50,8 @@ import { AIChatWrapper } from '@/components/AIChatWrapper';
 
 import Script from 'next/script';
 
+import PWAInstallButton from '@/components/PWAInstallButton';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -66,6 +68,39 @@ export default function RootLayout({
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9189923835531293"
           crossOrigin="anonymous"
           strategy="afterInteractive"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "AI ToolYes",
+              "url": "https://aitoolyes.com/",
+              "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://aitoolyes.com/blog?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "AI ToolYes",
+              "operatingSystem": "Web",
+              "applicationCategory": "DeveloperApplication",
+              "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+              }
+            })
+          }}
         />
       </head>
       <body className="min-h-full flex flex-col items-center p-4 md:p-8 relative">
@@ -92,9 +127,12 @@ export default function RootLayout({
                 <Link href="/#tools" className="hover:text-primary transition-colors">Tools</Link>
                 <Link href="/blog" className="hover:text-primary transition-colors">Blog</Link>
               </nav>
-              <Link href="/admin" className="bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/20 transition-all">
-                Admin Panel
-              </Link>
+              <div className="flex items-center gap-3">
+                <PWAInstallButton />
+                <Link href="/admin" className="hidden md:block bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/20 transition-all">
+                  Admin Panel
+                </Link>
+              </div>
             </header>
             
             {/* Page Content */}

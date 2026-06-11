@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://aitooyes.com';
+  const baseUrl = 'https://aitoolyes.com';
 
   const tools = [
     'ai-chat',
