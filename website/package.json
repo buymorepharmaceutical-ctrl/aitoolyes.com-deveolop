@@ -1,0 +1,50 @@
+{
+  "name": "ai-toolyes",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev --turbo -p 4000",
+    "build": "next build",
+    "start": "NODE_OPTIONS='--max-old-space-size=4096' next start -p 4000",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "^8.0.0",
+    "@capacitor/core": "^8.4.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
+    "@imgly/background-removal": "^1.7.0",
+    "@monaco-editor/react": "^4.7.0",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
+    "@types/marked": "^5.0.2",
+    "clsx": "^2.1.1",
+    "cron-parser": "^5.5.0",
+    "cronstrue": "^3.14.0",
+    "framer-motion": "^12.40.0",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^1.17.0",
+    "marked": "^18.0.5",
+    "next": "16.2.7",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-webcam": "^7.2.0",
+    "reactflow": "^11.11.4",
+    "sql-formatter": "^15.8.1",
+    "tailwind-merge": "^3.6.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.7",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
