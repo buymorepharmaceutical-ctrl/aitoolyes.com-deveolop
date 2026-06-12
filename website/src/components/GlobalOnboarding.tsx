@@ -75,7 +75,7 @@ export default function GlobalOnboarding() {
         >
           {/* Animated Background Match */}
           <div className="absolute inset-0 pointer-events-none opacity-100" style={{ 
-            backgroundImage: "url('/bg_waves.png')",
+            backgroundImage: "url('/bg_waves.webp')",
             backgroundSize: '120%',
             animation: 'bgPan 25s ease-in-out infinite alternate'
           }} />
@@ -93,7 +93,7 @@ export default function GlobalOnboarding() {
                 className="flex flex-col items-center z-10"
               >
                 <div className="w-32 h-32 md:w-48 md:h-48 relative mb-6 shadow-[0_0_50px_rgba(79,70,229,0.3)] rounded-3xl overflow-hidden">
-                  <Image src="/logo.png" alt="AI ToolYes Logo" fill className="object-cover" priority />
+                  <Image src="/logo.webp" alt="AI ToolYes Logo" fill className="object-cover" priority />
                 </div>
                 <motion.div
                   animate={{ opacity: [0.5, 1, 0.5] }}

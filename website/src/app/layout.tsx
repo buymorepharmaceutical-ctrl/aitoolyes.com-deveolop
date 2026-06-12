@@ -4,6 +4,7 @@ import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -72,7 +73,7 @@ export default function RootLayout({
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9189923835531293"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
         <script
           type="application/ld+json"
@@ -132,7 +133,7 @@ export default function RootLayout({
               animation: 'bgPan 25s ease-in-out infinite alternate'
             }}>
               <Image 
-                src="/bg_waves.png" 
+                src="/bg_waves.webp" 
                 alt="Background" 
                 fill 
                 priority 
