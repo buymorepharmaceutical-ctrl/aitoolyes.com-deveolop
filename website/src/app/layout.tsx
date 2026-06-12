@@ -134,8 +134,9 @@ export default function RootLayout({
               <nav className="hidden md:flex gap-6 text-sm font-medium">
                 <Link href="/" className="hover:text-primary transition-colors">Platform</Link>
                 <Link href="/tools" className="hover:text-primary transition-colors">Tools</Link>
-                <Link href="/about" className="hover:text-primary transition-colors">About Us</Link>
+                <Link href="/about" className="hover:text-primary transition-colors">About</Link>
                 <Link href="/blog" className="hover:text-primary transition-colors">Blog</Link>
+                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
               </nav>
               <div className="flex items-center gap-3">
                 <PWAInstallButton />
