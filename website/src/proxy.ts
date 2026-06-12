@@ -17,32 +17,8 @@ export default function proxy(request: NextRequest) {
   const now = Date.now();
   const windowData = rateLimitMap.get(ip);
 
-  // 1. Rate Limiting Logic
-  if (!windowData) {
-    rateLimitMap.set(ip, { count: 1, lastReset: now });
-  } else {
-    if (now - windowData.lastReset > WINDOW_SIZE_MS) {
-      rateLimitMap.set(ip, { count: 1, lastReset: now });
-    } else {
-      if (windowData.count >= MAX_REQUESTS) {
-        return new NextResponse(
-          JSON.stringify({ 
-            error: "Too Many Requests", 
-            message: "Security Alert: You have exceeded the maximum request limit (500 req/min). Please try again later."
-          }),
-          {
-            status: 429,
-            headers: {
-              'Content-Type': 'application/json',
-              'Retry-After': Math.ceil((WINDOW_SIZE_MS - (now - windowData.lastReset)) / 1000).toString()
-            }
-          }
-        );
-      }
-      windowData.count += 1;
-      rateLimitMap.set(ip, windowData);
-    }
-  }
+  // Rate Limiting Logic has been removed as per user request for scaling.
+  // Vercel's global infrastructure will handle load balancing automatically.
 
   // 2. Setup Security Headers & Auth Protection
   const response = NextResponse.next();
