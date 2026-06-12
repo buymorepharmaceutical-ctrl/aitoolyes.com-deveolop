@@ -213,7 +213,7 @@ export default function AIChat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-100px)] max-w-7xl mx-auto gap-4 relative overflow-hidden">
+    <div className="flex-1 min-h-[500px] h-full w-full max-w-7xl mx-auto flex gap-4 relative overflow-hidden">
       
       {/* Mobile Sidebar Overlay */}
       {showMobileSidebar && (

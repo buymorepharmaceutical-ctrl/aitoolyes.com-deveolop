@@ -46,13 +46,13 @@ export function AIChatWrapper() {
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform z-50"
+        className="fixed bottom-24 md:bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform z-50"
       >
         <Bot size={24} />
       </button>
 
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-80 sm:w-96 bg-white/90 backdrop-blur-xl border border-white/50 shadow-2xl rounded-3xl overflow-hidden z-50 flex flex-col h-[500px]">
+        <div className="fixed bottom-40 md:bottom-24 right-6 w-[calc(100vw-3rem)] md:w-96 bg-white/90 backdrop-blur-xl border border-white/50 shadow-2xl rounded-3xl overflow-hidden z-50 flex flex-col h-[60vh] md:h-[500px]">
           <div className="bg-primary/10 p-4 border-b border-primary/20 flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Bot className="text-primary" size={20} />
