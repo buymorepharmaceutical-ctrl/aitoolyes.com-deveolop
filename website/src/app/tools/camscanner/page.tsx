@@ -462,10 +462,11 @@ export default function CamScanner() {
             ) : (
               <>
                 <p className="text-sm text-foreground/70 text-center font-medium">Drag the 4 blue corners to align with your document.</p>
-                <div className="relative w-full max-w-2xl border-2 border-primary/20 rounded-xl overflow-hidden touch-none" style={{ maxHeight: '60vh' }}>
+                <div className="relative border-2 border-primary/20 rounded-xl overflow-hidden touch-none flex justify-center bg-black/5">
                   <canvas 
                     ref={cropCanvasRef}
-                    className="w-full h-auto object-contain cursor-crosshair touch-none"
+                    className="max-w-full h-auto cursor-crosshair touch-none"
+                    style={{ maxHeight: '60vh' }}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
