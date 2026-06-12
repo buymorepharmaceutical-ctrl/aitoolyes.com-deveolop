@@ -38,10 +38,14 @@ export default function AIChat() {
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
-  // API Settings
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('https://api.openai.com/v1');
   const [modelName, setModelName] = useState('gpt-4o');
+  
+  // Connection Testing
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   
   // Database States
   const [chats, setChats] = useState<{id: string, title: string, created_at: string}[]>([]);
@@ -136,6 +140,45 @@ export default function AIChat() {
     setShowSettings(false);
   };
 
+  const testConnection = async () => {
+    setIsTestingConnection(true);
+    setConnectionStatus('idle');
+    setAvailableModels([]);
+    try {
+      let endpoint = baseUrl;
+      if (endpoint.endsWith('/chat/completions')) {
+        endpoint = endpoint.replace('/chat/completions', '/models');
+      } else if (!endpoint.endsWith('/models')) {
+        endpoint = endpoint.replace(/\/$/, '') + '/models';
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': \`Bearer \${apiKey || 'dummy'}\`
+        }
+      });
+      
+      if (!res.ok) throw new Error('Failed');
+      
+      const data = await res.json();
+      if (data && data.data && Array.isArray(data.data)) {
+        const models = data.data.map((m: any) => m.id);
+        setAvailableModels(models);
+        if (models.length > 0 && !models.includes(modelName)) {
+          setModelName(models[0]);
+        }
+        setConnectionStatus('success');
+      } else {
+        setConnectionStatus('error');
+      }
+    } catch (e) {
+      setConnectionStatus('error');
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() && !selectedTool && !attachedImage) return;
     
@@ -178,19 +221,45 @@ export default function AIChat() {
       const chatHistory = newMessages.filter((m, i) => i !== 0 || m.role !== 'assistant');
       payloadMessages.push(...chatHistory);
 
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: payloadMessages,
-          apiConfig: apiKey ? { apiKey, baseUrl, modelName } : null
-        }),
-      });
+      let response;
+      const isLocal = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+      
+      if (isLocal) {
+        // Direct Client-Side Fetch for Local/Ollama (Bypass Next.js server)
+        const endpoint = baseUrl.endsWith('/chat/completions') 
+          ? baseUrl 
+          : \`\${baseUrl.replace(/\\/$/, '')}/chat/completions\`;
+          
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            "Authorization": \`Bearer \${apiKey || 'local'}\`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: payloadMessages,
+            stream: false
+          })
+        });
+      } else {
+        // Server-Side Fetch for Remote APIs (OpenAI/DeepSeek)
+        response = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: payloadMessages,
+            apiConfig: apiKey ? { apiKey, baseUrl, modelName } : null
+          }),
+        });
+      }
 
       if (!response.ok) throw new Error('API Error');
 
       const data = await response.json();
-      const finalMessages = [...newMessages, { role: 'assistant', content: data.response }] as Message[];
+      const assistantMessage = isLocal ? data.choices[0].message.content : data.response;
+      
+      const finalMessages = [...newMessages, { role: 'assistant', content: assistantMessage }] as Message[];
       setMessages(finalMessages);
       
       // Save full chat history to Supabase
@@ -198,7 +267,7 @@ export default function AIChat() {
         await supabase.from('ai_messages').insert({
           chat_id: activeChatId,
           role: 'assistant',
-          content: data.response
+          content: assistantMessage
         });
       }
     } catch (error) {
@@ -532,13 +601,46 @@ export default function AIChat() {
 
                 <div>
                   <label className="block text-sm font-semibold mb-1 text-gray-700">Model Name</label>
-                  <input 
-                    type="text" 
-                    value={modelName}
-                    onChange={(e) => setModelName(e.target.value)}
-                    placeholder="gpt-4o"
-                    className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                  />
+                  {availableModels.length > 0 ? (
+                    <select 
+                      value={modelName}
+                      onChange={(e) => setModelName(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-green-300 bg-green-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                    >
+                      {availableModels.map(model => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" 
+                      value={modelName}
+                      onChange={(e) => setModelName(e.target.value)}
+                      placeholder="gpt-4o"
+                      className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    />
+                  )}
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button 
+                    onClick={testConnection}
+                    disabled={isTestingConnection}
+                    className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    {isTestingConnection ? 'Testing...' : 'Test Connection & Detect Models'}
+                  </button>
+                  
+                  {connectionStatus === 'success' && (
+                    <div className="text-sm text-green-600 bg-green-50 p-2 rounded-lg border border-green-200 text-center font-medium">
+                      ✓ Connection Successful! AI Models detected.
+                    </div>
+                  )}
+                  {connectionStatus === 'error' && (
+                    <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 text-center font-medium">
+                      ✗ Connection Failed. Check your URL, CORS, or API Key.
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3">
