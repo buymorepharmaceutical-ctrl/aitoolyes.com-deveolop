@@ -360,18 +360,24 @@ export default function CamScanner() {
   };
 
   const extractText = async () => {
-    if (!processedImage) return;
+    if (!filteredImage && !processedImage) return;
     setIsOcrProcessing(true);
     try {
       const Tesseract = (await import('tesseract.js')).default;
-      const result = await Tesseract.recognize(filteredImage || processedImage, 'eng');
-      setOcrText(result.data.text);
-    } catch (error) {
-      console.error('OCR Error:', error);
-      alert('Failed to extract text.');
-    } finally {
-      setIsOcrProcessing(false);
+      // Use the filtered image for OCR as it has better contrast
+      const { data: { text } } = await Tesseract.recognize(
+        filteredImage || processedImage!,
+        'eng',
+        { 
+          logger: m => console.log(m),
+        }
+      );
+      setOcrText(text || "No text could be extracted. Please ensure the document is clear and well-lit.");
+    } catch (e) {
+      console.error(e);
+      setOcrText("Failed to extract text. Please try again.");
     }
+    setIsOcrProcessing(false);
   };
 
   const exportPdf = () => {
@@ -422,8 +428,13 @@ export default function CamScanner() {
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: "environment" }}
-                className="w-full object-cover max-h-[60vh]"
+                screenshotQuality={1}
+                videoConstraints={{
+                  facingMode: "environment",
+                  width: { ideal: 4096 },
+                  height: { ideal: 2160 }
+                }}
+                className="w-full h-full object-cover max-h-[60vh]"
                 mirrored={false}
               />
               <div className="absolute inset-0 border-2 border-primary/50 m-8 rounded-lg pointer-events-none opacity-50"></div>
