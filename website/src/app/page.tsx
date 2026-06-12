@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { blogs } from "@/data/blogs";
 
 export default function Home() {
   return (
@@ -423,94 +424,18 @@ export default function Home() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-          {/* Article 1 */}
-          <Link href="/blog/how-to-build-a-modern-ai-agent-saas">
-            <div className="flex flex-col gap-4 group cursor-pointer h-full">
-              <div className="w-full h-48 bg-white/40 rounded-2xl border border-white/50 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent mix-blend-overlay z-10"></div>
-                <Image src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80" alt="Blog cover" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-xs font-medium text-primary mb-2">
-                  <span className="bg-primary/10 px-2 py-1 rounded">Development</span>
-                  <span className="text-foreground/50">Oct 24, 2026</span>
+          {blogs.slice(0, 6).map((blog) => (
+            <Link key={blog.slug} href={`/blog/${blog.slug}`}>
+              <div className="flex flex-col gap-4 group cursor-pointer h-full bg-white/40 p-4 rounded-2xl hover:bg-white/60 transition-all border border-white/50 shadow-sm hover:shadow-md">
+                <div className="flex items-center gap-2 text-xs font-medium text-[#2e7d32] mb-1">
+                  <span className="bg-[#2e7d32]/10 px-2 py-1 rounded uppercase tracking-wider">{blog.tags[0] || 'Article'}</span>
+                  <span className="text-foreground/50">{new Date(blog.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">How to build a modern AI Agent SaaS</h3>
-                <p className="text-foreground/70 text-sm line-clamp-2">Learn the architecture and design patterns required to build a scalable AI Agent dashboard using Next.js and Glassmorphism.</p>
+                <h3 className="text-xl font-bold mb-1 group-hover:text-[#2e7d32] transition-colors line-clamp-2">{blog.title}</h3>
+                <p className="text-foreground/70 text-sm line-clamp-3">{blog.description}</p>
               </div>
-            </div>
-          </Link>
-
-          {/* Article 2 */}
-          <Link href="/blog/mastering-glassmorphism-in-tailwind-css">
-            <div className="flex flex-col gap-4 group cursor-pointer h-full">
-              <div className="w-full h-48 bg-white/40 rounded-2xl border border-white/50 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-bl from-green-500/20 to-transparent mix-blend-overlay z-10"></div>
-                <Image src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80" alt="Blog cover" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-xs font-medium text-green-600 mb-2">
-                  <span className="bg-green-500/10 px-2 py-1 rounded">Design</span>
-                  <span className="text-foreground/50">Oct 20, 2026</span>
-                </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-green-600 transition-colors">Mastering Glassmorphism in Tailwind CSS</h3>
-                <p className="text-foreground/70 text-sm line-clamp-2">A comprehensive guide to creating beautiful frosted glass effects, working with background blurs, and managing z-indexes.</p>
-              </div>
-            </div>
-          </Link>
-
-          {/* Article 3 */}
-          <Link href="/blog/best-practices-for-jwt-authentication">
-            <div className="flex flex-col gap-4 group cursor-pointer h-full">
-              <div className="w-full h-48 bg-white/40 rounded-2xl border border-white/50 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 to-transparent mix-blend-overlay z-10"></div>
-                <Image src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80" alt="Blog cover" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-xs font-medium text-purple-600 mb-2">
-                  <span className="bg-purple-500/10 px-2 py-1 rounded">Security</span>
-                  <span className="text-foreground/50">Oct 15, 2026</span>
-                </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-purple-600 transition-colors">Best practices for JWT Authentication</h3>
-                <p className="text-foreground/70 text-sm line-clamp-2">Discover how to securely store tokens, prevent XSS attacks, and implement refresh tokens in your web applications.</p>
-              </div>
-            </div>
-          </Link>
-          {/* Article 4 */}
-          <Link href="/blog/the-future-of-ai-in-content-creation">
-            <div className="flex flex-col gap-4 group cursor-pointer h-full">
-              <div className="w-full h-48 bg-white/40 rounded-2xl border border-white/50 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-tr from-sky-500/20 to-transparent mix-blend-overlay z-10"></div>
-                <Image src="https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80" alt="Blog cover" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-xs font-medium text-sky-600 mb-2">
-                  <span className="bg-sky-500/10 px-2 py-1 rounded">AI Trends</span>
-                  <span className="text-foreground/50">Oct 28, 2026</span>
-                </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-sky-600 transition-colors">The Future of AI in Content Creation</h3>
-                <p className="text-foreground/70 text-sm line-clamp-2">How AI is completely transforming the landscape of content creation, from initial drafts to final SEO optimization.</p>
-              </div>
-            </div>
-          </Link>
-
-          {/* Article 5 */}
-          <Link href="/blog/top-10-ai-tools-for-developers">
-            <div className="flex flex-col gap-4 group cursor-pointer h-full">
-              <div className="w-full h-48 bg-white/40 rounded-2xl border border-white/50 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-tr from-rose-500/20 to-transparent mix-blend-overlay z-10"></div>
-                <Image src="https://images.unsplash.com/photo-1555099962-4199c345e5dd?w=800&q=80" alt="Blog cover" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-xs font-medium text-rose-600 mb-2">
-                  <span className="bg-rose-500/10 px-2 py-1 rounded">Development</span>
-                  <span className="text-foreground/50">Nov 02, 2026</span>
-                </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-rose-600 transition-colors">Top 10 AI Tools for Developers in 2026</h3>
-                <p className="text-foreground/70 text-sm line-clamp-2">Discover the top AI assistants, code translators, and UI generators that are supercharging developer productivity.</p>
-              </div>
-            </div>
-          </Link>
+            </Link>
+          ))}
         </div>
       </div>
     </div>
