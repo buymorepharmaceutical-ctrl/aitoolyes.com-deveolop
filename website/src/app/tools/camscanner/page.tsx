@@ -214,7 +214,8 @@ export default function CamScanner() {
       for (let i = 0; i < contours.size(); ++i) {
         const cnt = contours.get(i);
         const area = cv.contourArea(cnt);
-        if (area > 1000) {
+        const minArea = (downscaled.cols * downscaled.rows) * 0.02; // Math: Must be >2% of image
+        if (area > minArea) {
           const peri = cv.arcLength(cnt, true);
           const approx = new cv.Mat();
           
@@ -438,10 +439,11 @@ export default function CamScanner() {
           const width = img.width;
           const height = img.height;
           
-          // Kickstart Optimization: Downscale to 250px for rapid manual processing
-          const ratio = height / 250.0; 
+          // Machine Learning High-Precision Manual Crop Optimization: 
+          // Use a massive 1000px matrix for mathematical precision during manual static analysis
+          const ratio = height / 1000.0; 
           const downscaled = new cv.Mat();
-          cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 250));
+          cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 1000));
 
           const gray = new cv.Mat();
           cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
@@ -473,7 +475,8 @@ export default function CamScanner() {
           for (let i = 0; i < contours.size(); ++i) {
             const cnt = contours.get(i);
             const area = cv.contourArea(cnt);
-            if (area > 1000) {
+            const minArea = (downscaled.cols * downscaled.rows) * 0.02; // Math: Must be >2% of image
+            if (area > minArea) {
               const peri = cv.arcLength(cnt, true);
               const approx = new cv.Mat();
               
