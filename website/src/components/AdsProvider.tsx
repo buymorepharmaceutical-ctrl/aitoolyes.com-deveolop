@@ -33,12 +33,7 @@ export default function AdsProvider() {
 
   return (
     <>
-      {/* 2. Google AdSense for Web/PWA */}
-      <script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9189923835531293"
-        crossOrigin="anonymous"
-      ></script>
+      {/* Google AdSense script is natively loaded in layout.tsx using next/script for better performance */}
     </>
   );
 }

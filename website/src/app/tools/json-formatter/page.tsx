@@ -156,7 +156,7 @@ export default function JsonFormatter() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] gap-4 p-4 lg:p-8 max-w-[1600px] mx-auto">
+    <div className="flex flex-col min-h-[calc(100vh-80px)] h-full gap-4 p-4 lg:p-8 max-w-[1600px] mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">

@@ -162,7 +162,7 @@ export default function AIUIGenerator() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] p-4 lg:p-8 max-w-[1600px] mx-auto gap-6">
+    <div className="flex flex-col min-h-[calc(100vh-80px)] h-full p-4 lg:p-8 max-w-[1600px] mx-auto gap-6">
       
       {/* Header */}
       <div>

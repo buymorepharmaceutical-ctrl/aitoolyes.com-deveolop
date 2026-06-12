@@ -42,6 +42,7 @@ export const viewport: Viewport = {
 };
 
 import Link from 'next/link';
+import Image from 'next/image';
 import AdsProvider from '@/components/AdsProvider';
 import AdSlot from '@/components/AdSlot';
 import GlobalOnboarding from '@/components/GlobalOnboarding';
@@ -108,11 +109,19 @@ export default function RootLayout({
           <GlobalOnboarding />
           {/* Animated Background */}
           <div className="fixed inset-0 z-[-1] overflow-hidden bg-[#0a0a0a]">
-            <div className="absolute inset-0 opacity-100" style={{ 
-              backgroundImage: "url('/bg_waves.png')",
-              backgroundSize: '120%',
+            <div className="absolute inset-0 opacity-100" style={{
               animation: 'bgPan 25s ease-in-out infinite alternate'
-            }} />
+            }}>
+              <Image 
+                src="/bg_waves.png" 
+                alt="Background" 
+                fill 
+                priority 
+                quality={75}
+                className="object-cover object-center w-[120%] h-[120%] max-w-[120%]"
+                style={{ transform: 'scale(1.2)' }}
+              />
+            </div>
             <div className="absolute inset-0 bg-black/30" />
           </div>
           

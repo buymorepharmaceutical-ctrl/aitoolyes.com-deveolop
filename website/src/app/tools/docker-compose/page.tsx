@@ -131,7 +131,7 @@ export default function DockerComposeGenerator() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] gap-6 p-4 lg:p-8 max-w-[1600px] mx-auto">
+    <div className="flex flex-col min-h-[calc(100vh-80px)] h-full gap-6 p-4 lg:p-8 max-w-[1600px] mx-auto">
       <div>
         <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
           <Box className="w-8 h-8 text-primary" />
