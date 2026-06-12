@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, User } from 'lucide-react';
-import Head from 'next/head';
 
 // Dynamic SEO Generation
 export async function generateMetadata({ params }: { params: { slug: string } }) {
@@ -40,24 +39,35 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
 
   return (
     <>
-      <Head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "BlogPosting",
-              "headline": blog.title,
-              "description": blog.description,
-              "author": {
-                "@type": "Organization",
-                "name": blog.author
-              },
-              "datePublished": blog.date,
-            })
-          }}
-        />
-      </Head>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": blog.title,
+            "description": blog.description,
+            "author": {
+              "@type": "Organization",
+              "name": blog.author
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": "AIToolYes",
+              "logo": {
+                "@type": "ImageObject",
+                "url": "https://aitoolyes.com/icons/icon-512x512.png"
+              }
+            },
+            "datePublished": blog.date,
+            "dateModified": blog.date,
+            "mainEntityOfPage": {
+              "@type": "WebPage",
+              "@id": `https://aitoolyes.com/blog/${blog.slug}`
+            }
+          })
+        }}
+      />
       <article className="min-h-screen bg-gray-50 py-12 px-6 sm:px-12 pb-32">
         <div className="max-w-3xl mx-auto space-y-12">
           

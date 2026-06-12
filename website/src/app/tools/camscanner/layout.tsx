@@ -2,17 +2,36 @@ import { Metadata } from 'next';
 import ToolSEOContent from '@/components/ToolSEOContent';
 
 export const metadata: Metadata = {
-  title: "Free Online Camscanner Tool | AI ToolYes",
-  description: "Use the free online Camscanner to boost your developer productivity. Instantly process data securely in your browser.",
+  title: "Free Browser-Based PDF Scanner | Scan to Text | AIToolYes",
+  description: "Scan documents directly in your browser. Our free online PDF scanner uses on-device AI for OCR. No installation needed, 100% private.",
+  keywords: "web-based PDF scanner, no-install PDF scanner for Chrome, scan PDF to text in browser, free online OCR, camscanner alternative web",
   alternates: { canonical: "https://aitoolyes.com/tools/camscanner" },
   openGraph: {
-    images: ['https://aitoolyes.com/api/og?title=Free%20Online%20Camscanner%20Tool']
+    images: ['https://aitoolyes.com/api/og?title=Free%20Browser-Based%20PDF%20Scanner']
   }
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "Browser PDF Scanner",
+            "operatingSystem": "Web",
+            "applicationCategory": "BusinessApplication",
+            "description": "Free web-based PDF and document scanner using on-device AI.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          })
+        }}
+      />
       {children}
       <ToolSEOContent 
         title="Camscanner" 

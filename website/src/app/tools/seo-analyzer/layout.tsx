@@ -2,17 +2,36 @@ import { Metadata } from 'next';
 import ToolSEOContent from '@/components/ToolSEOContent';
 
 export const metadata: Metadata = {
-  title: "Free Online Seo Analyzer Tool | AI ToolYes",
-  description: "Use the free online Seo Analyzer to boost your developer productivity. Instantly process data securely in your browser.",
+  title: "Free AI SEO Analyzer | Website SEO Checker | AIToolYes",
+  description: "Analyze your website SEO for free. Our AI SEO checker audits meta tags, keywords, and performance instantly in your browser.",
+  keywords: "free SEO analyzer, website SEO checker, AI SEO audit, analyze website SEO, technical SEO checker free",
   alternates: { canonical: "https://aitoolyes.com/tools/seo-analyzer" },
   openGraph: {
-    images: ['https://aitoolyes.com/api/og?title=Free%20Online%20Seo%20Analyzer%20Tool']
+    images: ['https://aitoolyes.com/api/og?title=Free%20AI%20SEO%20Analyzer']
   }
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "AI SEO Analyzer",
+            "operatingSystem": "Web",
+            "applicationCategory": "DeveloperApplication",
+            "description": "Free web-based AI SEO Analyzer for on-page audits.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          })
+        }}
+      />
       {children}
       <ToolSEOContent 
         title="Seo Analyzer" 

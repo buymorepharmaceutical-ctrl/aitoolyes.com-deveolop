@@ -7,9 +7,14 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AIToolYes - Free On-Device AI Tools (No Cloud, 100% Private)",
-  description: "Access 20+ completely free AI tools that run directly in your browser. From advanced document scanning to ATS resume checking. Zero cloud uploads, 100% privacy.",
-  keywords: "free on-device AI tools, privacy first AI, browser based document scanner, ATS resume checker online free, camscanner alternative web, AI developer tools no login, machine learning in browser, AIToolYes",
+  title: "Free AI Tools Suite - No Signup, 100% Private | AIToolYes",
+  description: "The ultimate all-in-one AI platform for free. Access ATS Resume Checkers, Browser PDF Scanners, SEO Analyzers, and more. No signup required, zero cloud uploads.",
+  keywords: "free AI tools, all-in-one AI platform for free, no signup AI generator, on-device AI tools, browser pdf scanner, free ats resume checker, privacy first AI, ATS resume checker online free, camscanner alternative web, AI developer tools no login, machine learning in browser, AIToolYes",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/icon-192x192.png",
+  },
   openGraph: {
     title: "AIToolYes - Premium AI Tools Built for Privacy",
     description: "Experience the fastest AI tools on the web. Document scanners, ATS checkers, and color extractors that run mathematically on your device without cloud servers.",
@@ -99,6 +104,21 @@ export default function RootLayout({
                 "price": "0",
                 "priceCurrency": "USD"
               }
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "AIToolYes",
+              "url": "https://aitoolyes.com",
+              "logo": "https://aitoolyes.com/icons/icon-512x512.png",
+              "sameAs": [
+                "https://twitter.com/aitoolyes"
+              ]
             })
           }}
         />

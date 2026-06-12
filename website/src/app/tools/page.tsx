@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { Camera, FileText, Palette, ArrowRight } from 'lucide-react';
 
 export const metadata = {
-  title: 'All AI Tools - AIToolYes',
-  description: 'Explore our directory of free, on-device AI tools including Document Scanners, Resume ATS Checkers, and Color Extractors.',
+  title: 'Best Free Online AI Tools for Productivity | AIToolYes',
+  description: 'Explore our suite of free online AI software. Includes ATS Resume Checker, Web-based PDF Scanner, and AI Image Tools. No install required.',
+  keywords: 'best free AI tools for productivity, online AI tools, top-rated AI tools, free online OCR, AI resume checker for job seekers',
 };
 
 export default function ToolsHub() {

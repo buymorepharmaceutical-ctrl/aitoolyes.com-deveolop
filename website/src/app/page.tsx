@@ -17,9 +17,6 @@ const toolsList = [
   { name: 'JWT Decoder', url: '/tools/jwt-decoder', icon: '🔐' },
   { name: 'JSON Formatter', url: '/tools/json-formatter', icon: '{ }' },
   { name: 'Glassmorphism UI', url: '/tools/glassmorphism-generator', icon: '🪟' },
-  { name: 'Docker Compose Gen', url: '/tools/docker-compose', icon: '🐳' }
-];
-
 export default function Home() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
