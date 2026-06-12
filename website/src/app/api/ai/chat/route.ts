@@ -132,8 +132,8 @@ export async function POST(req: NextRequest) {
     while (!isFinished && loopCount < MAX_LOOPS) {
       loopCount++;
 
-      // If User provided their own API configuration
-      if (apiConfig && apiConfig.apiKey) {
+      // If User provided their own API configuration (or custom URL without key like remote Ollama)
+      if (apiConfig && (apiConfig.apiKey || apiConfig.baseUrl !== 'https://api.openai.com/v1')) {
         console.log(`Using Custom AI: ${apiConfig.modelName} at ${apiConfig.baseUrl}`);
         responseData = await fetchCustomAI(messages, apiConfig);
         providerUsed = apiConfig.modelName;

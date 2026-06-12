@@ -249,7 +249,7 @@ export default function AIChat() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: payloadMessages,
-            apiConfig: apiKey ? { apiKey, baseUrl, modelName } : null
+            apiConfig: { apiKey: apiKey || '', baseUrl, modelName }
           }),
         });
       }

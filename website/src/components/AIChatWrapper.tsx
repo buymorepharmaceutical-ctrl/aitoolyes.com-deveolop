@@ -45,7 +45,8 @@ export function AIChatWrapper() {
   return (
     <>
       <button 
-        onClick={() => setIsOpen(true)}
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="Open AI Chat"
         className="fixed bottom-24 md:bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform z-50"
       >
         <Bot size={24} />
