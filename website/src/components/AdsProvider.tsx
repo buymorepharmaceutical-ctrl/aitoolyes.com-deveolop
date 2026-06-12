@@ -36,7 +36,7 @@ export default function AdsProvider() {
       {/* 2. Google AdSense for Web/PWA */}
       <script
         async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0000000000000000" // Replace with real Publisher ID
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9189923835531293"
         crossOrigin="anonymous"
       ></script>
     </>
