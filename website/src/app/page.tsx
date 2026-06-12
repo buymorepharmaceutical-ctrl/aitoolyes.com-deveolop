@@ -1,8 +1,30 @@
+"use client";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { blogs } from "@/data/blogs";
+import { Search, X } from "lucide-react";
+
+const toolsList = [
+  { name: 'Universal AI Assistant', url: '/tools/ai-chat', icon: '✨' },
+  { name: 'Advanced SEO Analyzer', url: '/tools/seo-analyzer', icon: '🌍' },
+  { name: 'Web Cam PDF Scanner', url: '/tools/camscanner', icon: '📸' },
+  { name: 'Code Architecture', url: '/tools/code-visualizer', icon: '⑆' },
+  { name: 'Code Snippet Manager', url: '/tools/code-snippet-manager', icon: '</>' },
+  { name: 'Background Remover', url: '/tools/background-remover', icon: '✂️' },
+  { name: 'Diff Checker', url: '/tools/diff-checker', icon: '⚖️' },
+  { name: 'Color Extractor', url: '/tools/color-extractor', icon: '🎨' },
+  { name: 'JWT Decoder', url: '/tools/jwt-decoder', icon: '🔐' },
+  { name: 'JSON Formatter', url: '/tools/json-formatter', icon: '{ }' },
+  { name: 'Glassmorphism UI', url: '/tools/glassmorphism-generator', icon: '🪟' },
+  { name: 'Docker Compose Gen', url: '/tools/docker-compose', icon: '🐳' }
+];
 
 export default function Home() {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filteredTools = toolsList.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()));
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-[80vh] py-12 px-4 text-center">
       <div className="mb-8 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/40 border border-white/50 text-sm font-medium">
@@ -28,7 +50,10 @@ export default function Home() {
           placeholder="Enter your email" 
           className="flex-1 w-full px-6 py-4 rounded-full border border-card-border bg-white/60 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground placeholder:text-foreground/50 shadow-sm"
         />
-        <button className="w-full sm:w-auto px-8 py-4 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-opacity-90 transition-all shadow-md">
+        <button 
+          onClick={() => setIsSearchOpen(true)}
+          className="w-full sm:w-auto px-8 py-4 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-opacity-90 transition-all shadow-md"
+        >
           Explore Tools
         </button>
       </div>
@@ -45,7 +70,7 @@ export default function Home() {
               </div>
               <h3 className="text-3xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Universal AI Assistant</h3>
               <p className="text-foreground/80 text-lg max-w-3xl">
-                <strong>Unlimited Chat kar sakte ho aur tools ko access kar sakte ho.</strong> Select any tool from the platform (JSON, UI, Scanner) and let the AI do the work for you directly in the chat window.
+                <strong>(Unlimited Chat)</strong> You can access all tools and chat unlimited times. Select any tool from the platform (JSON, UI, Scanner) and let the AI do the work for you directly in the chat window.
               </p>
             </div>
           </Link>
@@ -438,6 +463,47 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* Search Modal */}
+      {isSearchOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
+              <Search className="w-6 h-6 text-gray-400" />
+              <input 
+                type="text" 
+                autoFocus
+                placeholder="Search for tools (e.g. Scanner, JSON, SEO)..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none text-lg text-gray-800 placeholder-gray-400"
+              />
+              <button onClick={() => setIsSearchOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-gray-50/30">
+              {filteredTools.length > 0 ? (
+                filteredTools.map(tool => (
+                  <Link href={tool.url} key={tool.name} onClick={() => setIsSearchOpen(false)}>
+                    <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all cursor-pointer group">
+                      <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                        {tool.icon}
+                      </div>
+                      <div className="font-semibold text-gray-800 text-lg">{tool.name}</div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="py-12 text-center text-gray-400">
+                  <p className="text-lg">No tools found for "{searchQuery}"</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

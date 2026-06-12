@@ -7,7 +7,8 @@ import Head from 'next/head';
 
 // Dynamic SEO Generation
 export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const blog = blogs.find(b => b.slug === params.slug);
+  const decodedSlug = decodeURIComponent(params.slug).toLowerCase();
+  const blog = blogs.find(b => b.slug.toLowerCase() === decodedSlug);
   if (!blog) return { title: 'Not Found' };
   return {
     title: `${blog.title} - AIToolYes`,
@@ -30,7 +31,8 @@ export async function generateStaticParams() {
 }
 
 export default function BlogPost({ params }: { params: { slug: string } }) {
-  const blog = blogs.find(b => b.slug === params.slug);
+  const decodedSlug = decodeURIComponent(params.slug).toLowerCase();
+  const blog = blogs.find(b => b.slug.toLowerCase() === decodedSlug);
   
   if (!blog) {
     notFound();

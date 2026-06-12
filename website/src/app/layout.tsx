@@ -129,16 +129,16 @@ export default function RootLayout({
           {/* Main Dashboard Container */}
           <div className="w-full max-w-6xl flex-1 flex flex-col glass-panel bento-card relative z-10 min-h-[calc(100vh-2rem)]">
             {/* Header/Navbar */}
-            <header className="glass-header flex items-center justify-between p-3 md:px-8">
-              <Link href="/" className="font-bold text-xl tracking-tight text-primary">AI ToolYes</Link>
-              <nav className="hidden md:flex gap-6 text-sm font-medium">
-                <Link href="/" className="hover:text-primary transition-colors">Platform</Link>
+            <header className="glass-header flex flex-col md:flex-row items-center justify-between p-4 md:px-8 gap-4 md:gap-0">
+              <Link href="/" className="font-bold text-xl tracking-tight text-primary">AIToolYes</Link>
+              <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm font-medium w-full md:w-auto">
+                <Link href="/" className="hover:text-primary transition-colors">Home</Link>
                 <Link href="/tools" className="hover:text-primary transition-colors">Tools</Link>
                 <Link href="/about" className="hover:text-primary transition-colors">About</Link>
                 <Link href="/blog" className="hover:text-primary transition-colors">Blog</Link>
-                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
               </nav>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
                 <PWAInstallButton />
                 <Link href="/admin" className="hidden md:block bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/20 transition-all">
                   Admin Panel
