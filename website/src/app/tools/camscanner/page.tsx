@@ -131,22 +131,24 @@ export default function CamScanner() {
       const gray = new cv.Mat();
       cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
       
-      // Advanced Edge Detection: Bilateral Filter preserves edges but removes paper noise
-      const blurred = new cv.Mat();
-      cv.bilateralFilter(gray, blurred, 9, 75, 75, cv.BORDER_DEFAULT);
+      // Advanced Edge Detection: Morphological Gradient Engine
+      const grad = new cv.Mat();
+      const morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+      cv.morphologyEx(gray, grad, cv.MORPH_GRADIENT, morphKernel);
       
-      const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-      cv.morphologyEx(blurred, blurred, cv.MORPH_CLOSE, kernel);
+      const bw = new cv.Mat();
+      cv.threshold(grad, bw, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
       
-      cv.Canny(blurred, blurred, 40, 120);
-      cv.dilate(blurred, blurred, kernel, new cv.Point(-1, -1), 1);
+      const closed = new cv.Mat();
+      const closeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
+      cv.morphologyEx(bw, closed, cv.MORPH_CLOSE, closeKernel);
 
       const contours = new cv.MatVector();
       const hierarchy = new cv.Mat();
-      cv.findContours(blurred, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+      cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
       let maxArea = 0;
-      let bestApprox = new cv.Mat();
+      let bestApprox: any = null;
 
       for (let i = 0; i < contours.size(); ++i) {
         const cnt = contours.get(i);
@@ -154,11 +156,34 @@ export default function CamScanner() {
         if (area > 1000) {
           const peri = cv.arcLength(cnt, true);
           const approx = new cv.Mat();
-          cv.approxPolyDP(cnt, approx, 0.03 * peri, true);
           
-          if (approx.rows === 4 && area > maxArea) {
-            maxArea = area;
-            approx.copyTo(bestApprox);
+          let found4 = false;
+          for (let epsilonRatio = 0.02; epsilonRatio <= 0.1; epsilonRatio += 0.01) {
+              cv.approxPolyDP(cnt, approx, epsilonRatio * peri, true);
+              if (approx.rows === 4) {
+                  found4 = true;
+                  break;
+              }
+          }
+
+          if (!found4) {
+              const hull = new cv.Mat();
+              cv.convexHull(cnt, hull);
+              const hullPeri = cv.arcLength(hull, true);
+              for (let epsilonRatio = 0.02; epsilonRatio <= 0.1; epsilonRatio += 0.01) {
+                  cv.approxPolyDP(hull, approx, epsilonRatio * hullPeri, true);
+                  if (approx.rows === 4) {
+                      found4 = true;
+                      break;
+                  }
+              }
+              hull.delete();
+          }
+
+          if (found4 && cv.isContourConvex(approx) && area > maxArea) {
+             maxArea = area;
+             if (bestApprox) bestApprox.delete();
+             bestApprox = approx.clone();
           }
           approx.delete();
         }
@@ -167,7 +192,7 @@ export default function CamScanner() {
 
       overlayCtx.clearRect(0, 0, width, height);
 
-      if (maxArea > 0 && bestApprox.rows === 4) {
+      if (maxArea > 0 && bestApprox && bestApprox.rows === 4) {
         const pts: Point[] = [];
         for (let i = 0; i < 4; i++) {
           pts.push({ 
@@ -230,8 +255,9 @@ export default function CamScanner() {
         stabilityHistoryRef.current = []; 
       }
 
-      mat.delete(); downscaled.delete(); gray.delete(); blurred.delete();
-      kernel.delete(); contours.delete(); hierarchy.delete(); bestApprox.delete();
+      mat.delete(); downscaled.delete(); gray.delete(); grad.delete(); bw.delete(); closed.delete();
+      morphKernel.delete(); closeKernel.delete(); contours.delete(); hierarchy.delete(); 
+      if (bestApprox) bestApprox.delete();
 
     } catch (e) {
       console.error(e);
@@ -355,18 +381,24 @@ export default function CamScanner() {
           const gray = new cv.Mat();
           cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
           
-          // Bilateral Filter for precise manual edge detection
-          const blurred = new cv.Mat();
-          cv.bilateralFilter(gray, blurred, 9, 75, 75, cv.BORDER_DEFAULT);
+          // Advanced Edge Detection: Morphological Gradient Engine
+          const grad = new cv.Mat();
+          const morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+          cv.morphologyEx(gray, grad, cv.MORPH_GRADIENT, morphKernel);
           
-          cv.Canny(blurred, blurred, 40, 120);
+          const bw = new cv.Mat();
+          cv.threshold(grad, bw, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
           
+          const closed = new cv.Mat();
+          const closeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
+          cv.morphologyEx(bw, closed, cv.MORPH_CLOSE, closeKernel);
+
           const contours = new cv.MatVector();
           const hierarchy = new cv.Mat();
-          cv.findContours(blurred, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+          cv.findContours(closed, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
           let maxArea = 0;
-          let bestApprox = new cv.Mat();
+          let bestApprox: any = null;
 
           for (let i = 0; i < contours.size(); ++i) {
             const cnt = contours.get(i);
@@ -374,10 +406,34 @@ export default function CamScanner() {
             if (area > 1000) {
               const peri = cv.arcLength(cnt, true);
               const approx = new cv.Mat();
-              cv.approxPolyDP(cnt, approx, 0.03 * peri, true);
-              if (approx.rows === 4 && area > maxArea) {
-                maxArea = area;
-                approx.copyTo(bestApprox);
+              
+              let found4 = false;
+              for (let epsilonRatio = 0.02; epsilonRatio <= 0.1; epsilonRatio += 0.01) {
+                  cv.approxPolyDP(cnt, approx, epsilonRatio * peri, true);
+                  if (approx.rows === 4) {
+                      found4 = true;
+                      break;
+                  }
+              }
+
+              if (!found4) {
+                  const hull = new cv.Mat();
+                  cv.convexHull(cnt, hull);
+                  const hullPeri = cv.arcLength(hull, true);
+                  for (let epsilonRatio = 0.02; epsilonRatio <= 0.1; epsilonRatio += 0.01) {
+                      cv.approxPolyDP(hull, approx, epsilonRatio * hullPeri, true);
+                      if (approx.rows === 4) {
+                          found4 = true;
+                          break;
+                      }
+                  }
+                  hull.delete();
+              }
+
+              if (found4 && cv.isContourConvex(approx) && area > maxArea) {
+                 maxArea = area;
+                 if (bestApprox) bestApprox.delete();
+                 bestApprox = approx.clone();
               }
               approx.delete();
             }
@@ -385,7 +441,7 @@ export default function CamScanner() {
           }
 
           let pts: Point[] = [];
-          if (maxArea > 0 && bestApprox.rows === 4) {
+          if (maxArea > 0 && bestApprox && bestApprox.rows === 4) {
             for (let i = 0; i < 4; i++) {
               pts.push({ 
                 x: bestApprox.data32S[i * 2] * ratio, 
@@ -406,8 +462,9 @@ export default function CamScanner() {
             ];
           }
 
-          mat.delete(); downscaled.delete(); gray.delete(); blurred.delete();
-          contours.delete(); hierarchy.delete(); bestApprox.delete();
+          mat.delete(); downscaled.delete(); gray.delete(); grad.delete(); bw.delete(); closed.delete();
+          morphKernel.delete(); closeKernel.delete(); contours.delete(); hierarchy.delete(); 
+          if (bestApprox) bestApprox.delete();
 
           setCropCorners(pts);
           setRawImage(imageSrc);
