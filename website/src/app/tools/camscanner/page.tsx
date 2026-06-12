@@ -429,6 +429,7 @@ export default function CamScanner() {
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
                 screenshotQuality={1}
+                forceScreenshotSourceSize={true}
                 videoConstraints={{
                   facingMode: "environment",
                   width: { ideal: 4096 },
