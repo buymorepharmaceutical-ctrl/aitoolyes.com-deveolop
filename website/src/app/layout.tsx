@@ -103,7 +103,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="h-[100dvh] overflow-hidden flex flex-col items-center p-2 md:p-8 relative">
+      <body className="min-h-[100dvh] flex flex-col items-center p-2 md:p-8 pb-24 md:pb-8 relative">
         <GlobalAIProvider>
           <GlobalOnboarding />
           {/* Animated Background */}
@@ -118,7 +118,7 @@ export default function RootLayout({
           
           <AdsProvider />
           {/* Main Dashboard Container */}
-          <div className="w-full max-w-6xl flex-1 flex flex-col glass-panel overflow-hidden bento-card relative z-10">
+          <div className="w-full max-w-6xl flex-1 flex flex-col glass-panel bento-card relative z-10 min-h-[calc(100vh-2rem)]">
             {/* Header/Navbar */}
             <header className="glass-header flex items-center justify-between p-3 md:px-8">
               <Link href="/" className="font-bold text-xl tracking-tight text-primary">AI ToolYes</Link>
@@ -136,7 +136,7 @@ export default function RootLayout({
             </header>
             
             {/* Page Content */}
-            <main className="flex-1 overflow-auto flex flex-col p-3 md:p-8 pb-24 md:pb-8 relative">
+            <main className="flex-1 flex flex-col p-3 md:p-8 relative">
               <AdSlot />
               {children}
             </main>

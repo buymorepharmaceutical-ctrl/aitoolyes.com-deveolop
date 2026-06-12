@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
 
 const WINDOW_SIZE_MS = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 50; // 50 requests per minute
+const MAX_REQUESTS = 500; // 500 requests per minute
 
 export default function proxy(request: NextRequest) {
   // Extract the client IP
@@ -28,7 +28,7 @@ export default function proxy(request: NextRequest) {
         return new NextResponse(
           JSON.stringify({ 
             error: "Too Many Requests", 
-            message: "Security Alert: You have exceeded the maximum request limit (50 req/min). Please try again later."
+            message: "Security Alert: You have exceeded the maximum request limit (500 req/min). Please try again later."
           }),
           {
             status: 429,
