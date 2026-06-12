@@ -7,12 +7,12 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AI ToolYes - The Ultimate AI Powered Web Tools Platform",
-  description: "Boost your productivity with 20+ free AI tools including UI Generators, SEO Analyzers, Code Visualizers, and Content Summarizers.",
-  keywords: "AI tools, UI generator, SEO analyzer, free AI tools, glassmorphism generator, JSON formatter, developer tools, AI chat",
+  title: "AIToolYes - Free On-Device AI Tools (No Cloud, 100% Private)",
+  description: "Access 20+ completely free AI tools that run directly in your browser. From advanced document scanning to ATS resume checking. Zero cloud uploads, 100% privacy.",
+  keywords: "free on-device AI tools, privacy first AI, browser based document scanner, ATS resume checker online free, camscanner alternative web, AI developer tools no login, machine learning in browser, AIToolYes",
   openGraph: {
-    title: "AI ToolYes - Premium AI Tools",
-    description: "One AI Agent. The Output of a Full Team. Over 20+ premium tools for developers, designers, and marketers.",
+    title: "AIToolYes - Premium AI Tools Built for Privacy",
+    description: "Experience the fastest AI tools on the web. Document scanners, ATS checkers, and color extractors that run mathematically on your device without cloud servers.",
     url: "https://aitoolyes.com",
     siteName: "AI ToolYes",
     images: [
