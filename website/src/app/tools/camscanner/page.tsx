@@ -1,30 +1,44 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import jsPDF from 'jspdf';
-import { Camera, Image as ImageIcon, Download, RefreshCw, Wand2, FileText, Upload, Sparkles, Scissors } from 'lucide-react';
-import Link from 'next/link';
+import { Camera, Image as ImageIcon, Download, RefreshCw, Wand2, FileText, Upload, Sparkles, Scissors, Check, Crop } from 'lucide-react';
+import Script from 'next/script';
+
+declare let cv: any;
+
+type Point = { x: number, y: number };
 
 export default function CamScanner() {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const [cvReady, setCvReady] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [filter, setFilter] = useState<'original' | 'grayscale' | 'bw'>('original');
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrText, setOcrText] = useState<string | null>(null);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
-  const [isBgRemoving, setIsBgRemoving] = useState(false);
+  
+  // Crop state
+  const [mode, setMode] = useState<'camera' | 'crop' | 'result'>('camera');
+  const [corners, setCorners] = useState<Point[]>([
+    { x: 50, y: 50 }, { x: 250, y: 50 }, { x: 250, y: 350 }, { x: 50, y: 350 }
+  ]);
+  const [draggingPoint, setDraggingPoint] = useState<number | null>(null);
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
 
   const capture = useCallback(() => {
     if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      setImageSrc(imageSrc);
-      setProcessedImage(imageSrc);
-      setFilter('original');
+      const src = webcamRef.current.getScreenshot();
+      if (src) {
+        setImageSrc(src);
+        initCrop(src);
+      }
     }
   }, [webcamRef]);
 
@@ -35,57 +49,259 @@ export default function CamScanner() {
       reader.onload = (event) => {
         if (typeof event.target?.result === 'string') {
           setImageSrc(event.target.result);
-          setProcessedImage(event.target.result);
-          setFilter('original');
+          initCrop(event.target.result);
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const initCrop = (src: string) => {
+    setMode('crop');
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      setImgSize({ width: img.width, height: img.height });
+      // Default corners to 10% margin
+      let defaultCorners = [
+        { x: img.width * 0.1, y: img.height * 0.1 },
+        { x: img.width * 0.9, y: img.height * 0.1 },
+        { x: img.width * 0.9, y: img.height * 0.9 },
+        { x: img.width * 0.1, y: img.height * 0.9 }
+      ];
+
+      // Try OpenCV Auto Edge Detection if ready
+      if (cvReady && typeof cv !== 'undefined') {
+        try {
+          const mat = cv.imread(img);
+          const gray = new cv.Mat();
+          cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
+          cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+          cv.Canny(gray, gray, 75, 200);
+
+          const contours = new cv.MatVector();
+          const hierarchy = new cv.Mat();
+          cv.findContours(gray, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+          let maxArea = 0;
+          let bestApprox = new cv.Mat();
+
+          for (let i = 0; i < contours.size(); ++i) {
+            const cnt = contours.get(i);
+            const area = cv.contourArea(cnt);
+            if (area > 1000) {
+              const peri = cv.arcLength(cnt, true);
+              const approx = new cv.Mat();
+              cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+              if (approx.rows === 4 && area > maxArea) {
+                maxArea = area;
+                approx.copyTo(bestApprox);
+              }
+              approx.delete();
+            }
+            cnt.delete();
+          }
+
+          if (maxArea > 0 && bestApprox.rows === 4) {
+            const pts = [];
+            for (let i = 0; i < 4; i++) {
+              pts.push({ x: bestApprox.data32S[i * 2], y: bestApprox.data32S[i * 2 + 1] });
+            }
+            // Sort points: TL, TR, BR, BL
+            pts.sort((a, b) => a.y - b.y);
+            const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+            const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
+            defaultCorners = [top[0], top[1], bottom[0], bottom[1]];
+          }
+
+          mat.delete(); gray.delete(); contours.delete(); hierarchy.delete(); bestApprox.delete();
+        } catch (e) {
+          console.error("OpenCV Auto Crop Failed", e);
+        }
+      }
+      setCorners(defaultCorners);
+      drawCropUi(img, defaultCorners);
+    };
+  };
+
+  const drawCropUi = (img: HTMLImageElement, pts: Point[]) => {
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    // Draw Image
+    ctx.drawImage(img, 0, 0);
+
+    // Draw Polygon
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(14, 165, 233, 0.3)';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#0ea5e9';
+    ctx.stroke();
+
+    // Draw Corners
+    pts.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 20, 0, 2 * Math.PI);
+      ctx.fillStyle = draggingPoint === i ? '#ffffff' : '#0ea5e9';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+    });
+  };
+
+  useEffect(() => {
+    if (mode === 'crop' && imageSrc) {
+      const img = new Image();
+      img.src = imageSrc;
+      img.onload = () => drawCropUi(img, corners);
+    }
+  }, [corners, draggingPoint, mode]);
+
+  // Touch & Mouse Handlers for Cropping
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (mode !== 'crop') return;
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+    
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = (e as React.PointerEvent).clientX;
+      clientY = (e as React.PointerEvent).clientY;
+    }
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    const hitIndex = corners.findIndex(p => Math.hypot(p.x - x, p.y - y) < 40);
+    if (hitIndex !== -1) setDraggingPoint(hitIndex);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (draggingPoint === null || mode !== 'crop') return;
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = (e as React.PointerEvent).clientX;
+      clientY = (e as React.PointerEvent).clientY;
+    }
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = Math.max(0, Math.min(canvas.width, (clientX - rect.left) * scaleX));
+    const y = Math.max(0, Math.min(canvas.height, (clientY - rect.top) * scaleY));
+
+    const newCorners = [...corners];
+    newCorners[draggingPoint] = { x, y };
+    setCorners(newCorners);
+  };
+
+  const handlePointerUp = () => {
+    setDraggingPoint(null);
+  };
+
+  const applyPerspectiveCrop = () => {
+    if (!cvReady || typeof cv === 'undefined' || !imageSrc) {
+      alert("OpenCV is not ready yet. Please wait a moment.");
+      return;
+    }
+    
+    try {
+      const img = new Image();
+      img.src = imageSrc;
+      img.onload = () => {
+        const mat = cv.imread(img);
+        
+        // Calculate the max width and height for the new flattened image
+        const widthA = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
+        const widthB = Math.hypot(corners[2].x - corners[3].x, corners[2].y - corners[3].y);
+        const maxWidth = Math.max(widthA, widthB);
+
+        const heightA = Math.hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y);
+        const heightB = Math.hypot(corners[2].x - corners[1].x, corners[2].y - corners[1].y);
+        const maxHeight = Math.max(heightA, heightB);
+
+        const srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
+          corners[0].x, corners[0].y,
+          corners[1].x, corners[1].y,
+          corners[2].x, corners[2].y,
+          corners[3].x, corners[3].y
+        ]);
+
+        const dstCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
+          0, 0,
+          maxWidth - 1, 0,
+          maxWidth - 1, maxHeight - 1,
+          0, maxHeight - 1
+        ]);
+
+        const M = cv.getPerspectiveTransform(srcCoords, dstCoords);
+        const dst = new cv.Mat();
+        const dsize = new cv.Size(maxWidth, maxHeight);
+        cv.warpPerspective(mat, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+
+        const canvas = document.createElement('canvas');
+        cv.imshow(canvas, dst);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        
+        setProcessedImage(dataUrl);
+        setMode('result');
+        setFilter('original');
+
+        mat.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); dst.delete();
+      };
+    } catch (e) {
+      console.error("Perspective Transform Error", e);
+      alert("Failed to crop. Please try again.");
+    }
+  };
+
   const retake = () => {
+    setMode('camera');
     setImageSrc(null);
     setProcessedImage(null);
     setFilter('original');
     setOcrText(null);
   };
 
-  const extractText = async () => {
-    if (!processedImage) return;
-    setIsOcrProcessing(true);
-    try {
-      const Tesseract = (await import('tesseract.js')).default;
-      const result = await Tesseract.recognize(processedImage, 'eng');
-      setOcrText(result.data.text);
-    } catch (error) {
-      console.error('OCR Error:', error);
-      alert('Failed to extract text. Please try again.');
-    } finally {
-      setIsOcrProcessing(false);
-    }
-  };
-
-  const removeBackground = async () => {
-    if (!processedImage) return;
-    setIsBgRemoving(true);
-    try {
-      const { removeBackground: imglyRemoveBackground } = await import('@imgly/background-removal');
-      const blob = await imglyRemoveBackground(processedImage);
-      setProcessedImage(URL.createObjectURL(blob));
-    } catch (error) {
-      console.error('BG Remove Error:', error);
-      alert('Failed to remove background using ML model.');
-    } finally {
-      setIsBgRemoving(false);
-    }
-  };
+  const [filteredImage, setFilteredImage] = useState<string | null>(null);
 
   const applyFilter = (type: 'original' | 'grayscale' | 'bw') => {
     setFilter(type);
-    if (!imageSrc || !canvasRef.current) return;
+    if (type === 'original') {
+      setFilteredImage(null);
+      return;
+    }
+    
+    if (!processedImage) return;
     setIsProcessing(true);
 
-    const canvas = canvasRef.current;
+    const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
     
@@ -93,79 +309,84 @@ export default function CamScanner() {
       canvas.width = img.width;
       canvas.height = img.height;
       if (!ctx) return;
-      
       ctx.drawImage(img, 0, 0);
       
-      if (type !== 'original') {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          
-          // Calculate luminance
-          const v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-          
-          if (type === 'grayscale') {
-            data[i] = data[i+1] = data[i+2] = v;
-          } else if (type === 'bw') {
-            // High contrast thresholding for B&W document look
-            const threshold = 128;
-            const bw = v >= threshold ? 255 : 0;
-            data[i] = data[i+1] = data[i+2] = bw;
-          }
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        if (type === 'bw') {
+          const threshold = 128;
+          const v = avg > threshold ? 255 : 0;
+          data[i] = data[i + 1] = data[i + 2] = v;
+        } else {
+          data[i] = data[i + 1] = data[i + 2] = avg;
         }
-        ctx.putImageData(imageData, 0, 0);
       }
-      
-      setProcessedImage(canvas.toDataURL('image/jpeg', 0.9));
+      ctx.putImageData(imageData, 0, 0);
+      setFilteredImage(canvas.toDataURL('image/jpeg', 0.9));
       setIsProcessing(false);
     };
-    img.src = imageSrc;
+    img.src = processedImage;
   };
 
-  const downloadPDF = () => {
+  const extractText = async () => {
     if (!processedImage) return;
-    
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'px',
-      format: 'a4'
-    });
-    
-    const imgProps = pdf.getImageProperties(processedImage);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    
-    pdf.addImage(processedImage, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save('Eloxon-Scanned-Document.pdf');
+    setIsOcrProcessing(true);
+    try {
+      const Tesseract = (await import('tesseract.js')).default;
+      const result = await Tesseract.recognize(filteredImage || processedImage, 'eng');
+      setOcrText(result.data.text);
+    } catch (error) {
+      console.error('OCR Error:', error);
+      alert('Failed to extract text.');
+    } finally {
+      setIsOcrProcessing(false);
+    }
   };
 
-  const downloadImage = () => {
-    if (!processedImage) return;
-    const a = document.createElement('a');
-    a.href = processedImage;
-    a.download = 'Eloxon-Scan.jpg';
-    a.click();
+  const exportPdf = () => {
+    const finalImage = filteredImage || processedImage;
+    if (!finalImage) return;
+    
+    const img = new Image();
+    img.onload = () => {
+      const pdf = new jsPDF({
+        orientation: img.width > img.height ? 'l' : 'p',
+        unit: 'px',
+        format: [img.width, img.height]
+      });
+      pdf.addImage(finalImage, 'JPEG', 0, 0, img.width, img.height);
+      pdf.save('AI-Scanned-Document.pdf');
+    };
+    img.src = finalImage;
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-80px)] h-full gap-6 p-4 lg:p-8 max-w-5xl mx-auto">
+    <div className="flex-1 min-h-[calc(100vh-80px)] h-full flex flex-col gap-6 p-4 lg:p-8 max-w-5xl mx-auto">
+      <Script 
+        src="https://docs.opencv.org/4.8.0/opencv.js" 
+        strategy="lazyOnload" 
+        onLoad={() => setCvReady(true)}
+      />
+
       <div>
         <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
           <Camera className="w-8 h-8 text-primary" />
-          Web Cam pdf Scanner
+          Advanced PDF Scanner
         </h1>
-        <p className="text-foreground/70 mt-1">Scan or upload documents directly from your browser, apply B&W filters, and export as PDF.</p>
+        <p className="text-foreground/70 mt-1">Smart edge detection, perspective flattening, OCR, and high-quality PDF export.</p>
+        {!cvReady && (
+          <div className="text-yellow-600 bg-yellow-100 p-2 rounded mt-2 text-sm">
+            Loading AI Vision Engine (OpenCV)... Please wait.
+          </div>
+        )}
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center border border-card-border rounded-2xl bg-white/40 backdrop-blur-md shadow-sm overflow-hidden p-4 relative min-h-[500px]">
-        {/* Hidden Canvas for Processing */}
-        <canvas ref={canvasRef} className="hidden" />
+        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
 
-        {!imageSrc ? (
+        {mode === 'camera' && (
           <div className="w-full max-w-2xl flex flex-col items-center gap-4">
             <div className="rounded-xl overflow-hidden shadow-lg border-4 border-white/50 w-full relative">
               <Webcam
@@ -173,131 +394,97 @@ export default function CamScanner() {
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
                 videoConstraints={{ facingMode: "environment" }}
-                className="w-full object-cover"
+                className="w-full object-cover max-h-[60vh]"
                 mirrored={false}
               />
               <div className="absolute inset-0 border-2 border-primary/50 m-8 rounded-lg pointer-events-none opacity-50"></div>
             </div>
             
-            <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-              <button 
-                onClick={capture}
-                className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl w-full sm:w-auto"
-              >
-                <Camera className="w-6 h-6" />
-                Capture Document
+            <div className="flex flex-wrap gap-4 justify-center">
+              <button onClick={() => fileInputRef.current?.click()} className="btn btn-outline flex items-center gap-2">
+                <Upload className="w-4 h-4" /> Upload Image
               </button>
-              <div className="text-foreground/50 font-medium">OR</div>
-              <input 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 bg-white text-gray-800 border-2 border-gray-200 px-8 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl w-full sm:w-auto"
-              >
-                <Upload className="w-6 h-6" />
-                Upload from Album
+              <button onClick={capture} className="btn btn-primary flex items-center gap-2">
+                <Camera className="w-4 h-4" /> Capture Document
               </button>
             </div>
           </div>
-        ) : (
-          <div className="w-full flex flex-col md:flex-row gap-8 items-start h-full">
-            <div className="flex-1 flex flex-col items-center justify-center w-full bg-black/5 rounded-xl p-4 min-h-[400px]">
-              {isProcessing ? (
-                <div className="animate-pulse text-primary font-bold">Processing Image...</div>
-              ) : (
-                <img src={processedImage!} alt="Scanned Document" className="max-h-[60vh] object-contain shadow-2xl rounded" />
-              )}
+        )}
+
+        {mode === 'crop' && (
+          <div className="w-full h-full flex flex-col items-center gap-4">
+            <p className="text-sm text-foreground/70 text-center font-medium">Drag the 4 blue corners to align with your document.</p>
+            <div className="relative w-full max-w-2xl border-2 border-primary/20 rounded-xl overflow-hidden touch-none" style={{ maxHeight: '60vh' }}>
+              <canvas 
+                ref={cropCanvasRef}
+                className="w-full h-auto object-contain cursor-crosshair touch-none"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                onTouchStart={handlePointerDown}
+                onTouchMove={handlePointerMove}
+                onTouchEnd={handlePointerUp}
+              />
             </div>
+            <div className="flex gap-4">
+              <button onClick={retake} className="btn btn-outline flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" /> Retake
+              </button>
+              <button onClick={applyPerspectiveCrop} disabled={!cvReady} className="btn btn-primary flex items-center gap-2">
+                <Crop className="w-4 h-4" /> Confirm Crop
+              </button>
+            </div>
+          </div>
+        )}
 
-            <div className="w-full md:w-80 flex flex-col gap-6 bg-white/80 p-6 rounded-2xl shadow-sm border border-card-border">
-              <div>
-                <h3 className="font-bold text-lg mb-3">1. Filters</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  <button 
-                    onClick={() => applyFilter('original')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm text-left flex items-center gap-2 transition-colors ${filter === 'original' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100 border'}`}
-                  >
-                    <ImageIcon className="w-4 h-4" /> Original Color
-                  </button>
-                  <button 
-                    onClick={() => applyFilter('grayscale')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm text-left flex items-center gap-2 transition-colors ${filter === 'grayscale' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100 border'}`}
-                  >
-                    <Wand2 className="w-4 h-4" /> Grayscale (Magic)
-                  </button>
-                  <button 
-                    onClick={() => applyFilter('bw')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm text-left flex items-center gap-2 transition-colors ${filter === 'bw' ? 'bg-primary text-white' : 'bg-white hover:bg-gray-100 border'}`}
-                  >
-                    <FileText className="w-4 h-4" /> Black & White (Text)
-                  </button>
-                </div>
+        {mode === 'result' && processedImage && (
+          <div className="w-full h-full flex flex-col md:flex-row gap-6">
+            <div className="flex-1 flex flex-col items-center gap-4">
+              <div className="relative rounded-xl overflow-hidden shadow-xl border-4 border-white w-full flex justify-center bg-gray-100 p-2 min-h-[300px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={filteredImage || processedImage} className="w-full max-w-md h-auto object-contain shadow-sm" alt="Result" />
               </div>
 
-              <div>
-                <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><Sparkles className="w-5 h-5 text-purple-500" /> AI Tools</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  <button 
-                    onClick={extractText}
-                    disabled={isOcrProcessing}
-                    className="flex justify-center items-center gap-2 bg-purple-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-600 transition-colors disabled:opacity-50"
+              <div className="flex flex-wrap gap-2 justify-center">
+                {(['original', 'grayscale', 'bw'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => applyFilter(t)}
+                    disabled={isProcessing}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      filter === t ? 'bg-primary text-white shadow-md' : 'bg-primary/10 text-primary hover:bg-primary/20'
+                    }`}
                   >
-                    {isOcrProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                    {isOcrProcessing ? 'Extracting...' : 'AI Extract Text (OCR)'}
+                    {t === 'original' ? 'Original' : t === 'grayscale' ? 'Grayscale' : 'B&W Magic'}
                   </button>
-                  <button 
-                    onClick={removeBackground}
-                    disabled={isBgRemoving}
-                    className="flex justify-center items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-600 transition-colors disabled:opacity-50"
-                  >
-                    {isBgRemoving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
-                    {isBgRemoving ? 'Removing BG...' : 'AI Remove Background'}
-                  </button>
-                </div>
+                ))}
               </div>
-
-              {ocrText && (
-                <div className="bg-white/90 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-bold text-sm mb-2 text-gray-700 flex justify-between items-center">
-                    Extracted Text:
-                    <button onClick={() => navigator.clipboard.writeText(ocrText)} className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300">Copy</button>
-                  </h4>
-                  <p className="text-xs text-gray-600 max-h-32 overflow-y-auto whitespace-pre-wrap">{ocrText}</p>
-                </div>
-              )}
-
-              <div>
-                <h3 className="font-bold text-lg mb-3">2. Export</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  <button 
-                    onClick={downloadPDF}
-                    className="flex justify-center items-center gap-2 bg-emerald-500 text-white px-4 py-3 rounded-lg font-bold hover:bg-emerald-600 transition-colors"
-                  >
-                    <Download className="w-5 h-5" /> Download PDF
-                  </button>
-                  <button 
-                    onClick={downloadImage}
-                    className="flex justify-center items-center gap-2 bg-white text-gray-800 border-2 border-gray-200 px-4 py-2 rounded-lg font-bold hover:bg-gray-50 transition-colors"
-                  >
-                    <Download className="w-4 h-4" /> Download JPG
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-auto pt-4 border-t">
-                <button 
-                  onClick={retake}
-                  className="flex justify-center items-center w-full gap-2 text-rose-500 font-bold hover:underline"
-                >
-                  <RefreshCw className="w-4 h-4" /> Retake Photo
+              
+              <div className="flex flex-wrap gap-3 justify-center w-full">
+                <button onClick={retake} className="btn btn-outline flex-1 min-w-[120px]">
+                  <RefreshCw className="w-4 h-4 mr-2" /> New
+                </button>
+                <button onClick={extractText} disabled={isOcrProcessing} className="btn btn-secondary flex-1 min-w-[120px]">
+                  {isOcrProcessing ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                  Extract OCR
+                </button>
+                <button onClick={exportPdf} className="btn btn-primary flex-1 min-w-[120px]">
+                  <Download className="w-4 h-4 mr-2" /> Save PDF
                 </button>
               </div>
             </div>
+
+            {ocrText && (
+              <div className="w-full md:w-80 flex flex-col gap-3">
+                <h3 className="font-semibold text-foreground">Extracted Text</h3>
+                <textarea 
+                  className="w-full flex-1 min-h-[200px] p-3 rounded-xl border border-input bg-background/50 text-sm"
+                  value={ocrText}
+                  onChange={(e) => setOcrText(e.target.value)}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
