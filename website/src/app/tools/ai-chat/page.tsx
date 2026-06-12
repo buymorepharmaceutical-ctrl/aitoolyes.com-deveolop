@@ -145,7 +145,7 @@ export default function AIChat() {
     setConnectionStatus('idle');
     setAvailableModels([]);
     try {
-      let endpoint = baseUrl.replace(/\\/+$/, ''); // remove trailing slash
+      let endpoint = baseUrl.replace(/[\\/]+$/, ''); // remove trailing slash
       let endpointsToTry = [];
       
       if (endpoint.endsWith('/v1')) {
