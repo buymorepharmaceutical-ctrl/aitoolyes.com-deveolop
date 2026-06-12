@@ -254,11 +254,11 @@ export default function CamScanner() {
   const extractDocumentAndSave = (sourceMat: any, corners: Point[]) => {
       const widthA = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
       const widthB = Math.hypot(corners[2].x - corners[3].x, corners[2].y - corners[3].y);
-      const maxWidth = Math.max(widthA, widthB);
+      const maxWidth = Math.round(Math.max(widthA, widthB));
 
       const heightA = Math.hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y);
       const heightB = Math.hypot(corners[2].x - corners[1].x, corners[2].y - corners[1].y);
-      const maxHeight = Math.max(heightA, heightB);
+      const maxHeight = Math.round(Math.max(heightA, heightB));
 
       const srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
         corners[0].x, corners[0].y,
@@ -277,7 +277,7 @@ export default function CamScanner() {
       const M = cv.getPerspectiveTransform(srcCoords, dstCoords);
       const dst = new cv.Mat();
       const dsize = new cv.Size(maxWidth, maxHeight);
-      cv.warpPerspective(sourceMat, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+      cv.warpPerspective(sourceMat, dst, M, dsize);
 
       // Magic Filter (Adaptive Threshold) automatically applied
       const gray = new cv.Mat();
@@ -481,20 +481,22 @@ export default function CamScanner() {
     setComputingMsg('AI Computing Engine: Cropping & Filtering...');
     
     setTimeout(() => {
-      try {
-        const img = new Image();
-        img.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
           const mat = cv.imread(img);
           extractDocumentAndSave(mat, cropCorners);
           mat.delete();
           setMode('gallery');
+        } catch (e: any) {
+          console.error("Crop error:", e);
+          alert("Error processing crop: " + (e.message || "Unknown OpenCV Error"));
+        } finally {
           setIsComputing(false);
-        };
-        img.src = rawImage;
-      } catch (e) {
-        console.error(e);
-        setIsComputing(false);
-      }
+        }
+      };
+      img.onerror = () => setIsComputing(false);
+      img.src = rawImage;
     }, 100);
   };
 
