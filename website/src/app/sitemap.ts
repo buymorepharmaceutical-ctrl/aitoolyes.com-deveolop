@@ -1,4 +1,5 @@
 import { MetadataRoute } from 'next';
+import { blogs } from '@/data/blogs';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://aitoolyes.com';
@@ -30,20 +31,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     'password-generator',
     'qrcode',
     'regex-tester',
+    'resume-ats',
     'seo-analyzer',
     'sql-formatter',
     'ui-generator',
     'uuid',
     'video-to-frames',
     'word-counter',
-  ];
-
-  const blogPosts = [
-    'how-to-build-a-modern-ai-agent-saas',
-    'mastering-glassmorphism-in-tailwind-css',
-    'best-practices-for-jwt-authentication',
-    'the-future-of-ai-in-content-creation',
-    'top-10-ai-tools-for-developers',
   ];
 
   const toolUrls = tools.map((tool) => ({
@@ -53,9 +47,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  const blogUrls = blogPosts.map((post) => ({
-    url: `${baseUrl}/blog/${post}`,
-    lastModified: new Date(),
+  const blogUrls = blogs.map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.date),
     changeFrequency: 'monthly' as const,
     priority: 0.7,
   }));
@@ -66,6 +60,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/about`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/tools`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
     },
     {
       url: `${baseUrl}/blog`,

@@ -133,7 +133,8 @@ export default function RootLayout({
               <Link href="/" className="font-bold text-xl tracking-tight text-primary">AI ToolYes</Link>
               <nav className="hidden md:flex gap-6 text-sm font-medium">
                 <Link href="/" className="hover:text-primary transition-colors">Platform</Link>
-                <Link href="/#tools" className="hover:text-primary transition-colors">Tools</Link>
+                <Link href="/tools" className="hover:text-primary transition-colors">Tools</Link>
+                <Link href="/about" className="hover:text-primary transition-colors">About Us</Link>
                 <Link href="/blog" className="hover:text-primary transition-colors">Blog</Link>
               </nav>
               <div className="flex items-center gap-3">
