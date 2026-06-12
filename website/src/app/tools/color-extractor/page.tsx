@@ -113,27 +113,62 @@ export default function AdvancedColorExtractor() {
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      const colorCounts: Record<string, number> = {};
-
-      for (let i = 0; i < data.length; i += 40) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
-        
-        if (a < 128) continue;
-        const rgb = `rgb(${Math.round(r / 20) * 20}, ${Math.round(g / 20) * 20}, ${Math.round(b / 20) * 20})`;
-        colorCounts[rgb] = (colorCounts[rgb] || 0) + 1;
+      
+      // Fast K-Means Clustering for Dominant Colors
+      const k = 6;
+      let centroids: {r: number, g: number, b: number}[] = [];
+      const pixelStep = 40; // Sample every 10th pixel for speed
+      
+      // 1. Initialize random centroids from actual image pixels
+      for (let i = 0; i < k; i++) {
+        let idx = Math.floor(Math.random() * (data.length / 4)) * 4;
+        centroids.push({ r: data[idx], g: data[idx + 1], b: data[idx + 2] });
       }
 
-      const sortedColors = Object.entries(colorCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([color]) => color);
+      // 2. Run K-Means for a few iterations
+      for (let iter = 0; iter < 5; iter++) {
+        const clusters = Array.from({ length: k }, () => ({ r: 0, g: 0, b: 0, count: 0 }));
+        
+        for (let i = 0; i < data.length; i += pixelStep) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+          
+          if (a < 128) continue; // Skip transparent
+          
+          // Find closest centroid (using Manhattan distance for speed)
+          let minDist = Infinity;
+          let minIdx = 0;
+          for (let j = 0; j < k; j++) {
+            const dist = Math.abs(r - centroids[j].r) + Math.abs(g - centroids[j].g) + Math.abs(b - centroids[j].b);
+            if (dist < minDist) {
+              minDist = dist;
+              minIdx = j;
+            }
+          }
+          
+          clusters[minIdx].r += r;
+          clusters[minIdx].g += g;
+          clusters[minIdx].b += b;
+          clusters[minIdx].count++;
+        }
+        
+        // Update centroids
+        centroids = clusters.map(c => 
+          c.count === 0 
+            ? { r: Math.floor(Math.random() * 255), g: Math.floor(Math.random() * 255), b: Math.floor(Math.random() * 255) } 
+            : { r: Math.round(c.r / c.count), g: Math.round(c.g / c.count), b: Math.round(c.b / c.count) }
+        );
+      }
 
-      const hexColors = sortedColors.map(c => {
-        const [r, g, b] = c.match(/\\d+/g)!.map(Number);
-        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+      // Sort by perceived luminance to create a nice gradient palette
+      const hexColors = centroids.sort((a, b) => {
+        const lumA = a.r * 0.299 + a.g * 0.587 + a.b * 0.114;
+        const lumB = b.r * 0.299 + b.g * 0.587 + b.b * 0.114;
+        return lumA - lumB;
+      }).map(c => {
+        return "#" + ((1 << 24) + (c.r << 16) + (c.g << 8) + c.b).toString(16).slice(1).toUpperCase();
       });
 
       setExtractedColors(hexColors);

@@ -145,33 +145,55 @@ export default function AIChat() {
     setConnectionStatus('idle');
     setAvailableModels([]);
     try {
-      let endpoint = baseUrl;
-      if (endpoint.endsWith('/chat/completions')) {
-        endpoint = endpoint.replace('/chat/completions', '/models');
-      } else if (!endpoint.endsWith('/models')) {
-        endpoint = endpoint.replace(/\/$/, '') + '/models';
+      let endpoint = baseUrl.replace(/\\/+$/, ''); // remove trailing slash
+      let endpointsToTry = [];
+      
+      if (endpoint.endsWith('/v1')) {
+        endpointsToTry.push(`${endpoint}/models`);
+      } else if (endpoint.includes('localhost') || endpoint.includes('127.0.0.1')) {
+        // Native Ollama
+        endpointsToTry.push(`${endpoint}/api/tags`);
+        endpointsToTry.push(`${endpoint}/v1/models`);
+      } else {
+        // Standard OpenAI-like
+        endpointsToTry.push(`${endpoint}/models`);
+        endpointsToTry.push(`${endpoint}/v1/models`);
       }
 
-      const res = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey || 'dummy'}`
+      let data = null;
+      for (const ep of endpointsToTry) {
+        try {
+          const res = await fetch(ep, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${apiKey || 'dummy'}` }
+          });
+          if (res.ok) {
+            data = await res.json();
+            break;
+          }
+        } catch (e) {
+          // ignore and try next
         }
-      });
-      
-      if (!res.ok) throw new Error('Failed');
-      
-      const data = await res.json();
-      if (data && data.data && Array.isArray(data.data)) {
-        const models = data.data.map((m: any) => m.id);
-        setAvailableModels(models);
-        if (models.length > 0 && !models.includes(modelName)) {
-          setModelName(models[0]);
-        }
-        setConnectionStatus('success');
-      } else {
-        setConnectionStatus('error');
       }
+
+      if (data) {
+        let models: string[] = [];
+        if (data.data && Array.isArray(data.data)) {
+          models = data.data.map((m: any) => m.id); // OpenAI format
+        } else if (data.models && Array.isArray(data.models)) {
+          models = data.models.map((m: any) => m.name); // Ollama native format
+        }
+
+        if (models.length > 0) {
+          setAvailableModels(models);
+          if (!models.includes(modelName)) {
+            setModelName(models[0]);
+          }
+          setConnectionStatus('success');
+          return;
+        }
+      }
+      setConnectionStatus('error');
     } catch (e) {
       setConnectionStatus('error');
     } finally {
