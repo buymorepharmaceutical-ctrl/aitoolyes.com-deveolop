@@ -23,6 +23,8 @@ export default function CamScanner() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrText, setOcrText] = useState<string | null>(null);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [isComputingCrop, setIsComputingCrop] = useState(false);
+  const [isBgRemoving, setIsBgRemoving] = useState(false);
   
   // Crop state
   const [mode, setMode] = useState<'camera' | 'crop' | 'result'>('camera');
@@ -58,11 +60,11 @@ export default function CamScanner() {
 
   const initCrop = (src: string) => {
     setMode('crop');
+    setIsComputingCrop(true);
     const img = new Image();
     img.src = src;
     img.onload = () => {
       setImgSize({ width: img.width, height: img.height });
-      // Default corners to 10% margin
       let defaultCorners = [
         { x: img.width * 0.1, y: img.height * 0.1 },
         { x: img.width * 0.9, y: img.height * 0.1 },
@@ -70,57 +72,84 @@ export default function CamScanner() {
         { x: img.width * 0.1, y: img.height * 0.9 }
       ];
 
-      // Try OpenCV Auto Edge Detection if ready
-      if (cvReady && typeof cv !== 'undefined') {
-        try {
-          const mat = cv.imread(img);
-          const gray = new cv.Mat();
-          cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
-          cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-          cv.Canny(gray, gray, 75, 200);
+      // Give UI time to show "Computing..." before locking thread
+      setTimeout(() => {
+        if (cvReady && typeof cv !== 'undefined') {
+          try {
+            const mat = cv.imread(img);
+            
+            // Downscale for faster and more robust edge detection
+            const ratio = img.height / 500.0;
+            const downscaled = new cv.Mat();
+            cv.resize(mat, downscaled, new cv.Size(Math.round(img.width / ratio), 500));
 
-          const contours = new cv.MatVector();
-          const hierarchy = new cv.Mat();
-          cv.findContours(gray, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+            const gray = new cv.Mat();
+            cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
+            
+            // Robust Edge Detection Pipeline
+            cv.medianBlur(gray, gray, 5);
+            cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+            
+            // Dilate & Close to connect broken document edges
+            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+            cv.morphologyEx(gray, gray, cv.MORPH_CLOSE, kernel);
+            
+            // Adaptive Canny Edge Detection
+            cv.Canny(gray, gray, 50, 150);
+            cv.dilate(gray, gray, kernel, new cv.Point(-1, -1), 1);
 
-          let maxArea = 0;
-          let bestApprox = new cv.Mat();
+            const contours = new cv.MatVector();
+            const hierarchy = new cv.Mat();
+            cv.findContours(gray, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-          for (let i = 0; i < contours.size(); ++i) {
-            const cnt = contours.get(i);
-            const area = cv.contourArea(cnt);
-            if (area > 1000) {
-              const peri = cv.arcLength(cnt, true);
-              const approx = new cv.Mat();
-              cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-              if (approx.rows === 4 && area > maxArea) {
-                maxArea = area;
-                approx.copyTo(bestApprox);
+            let maxArea = 0;
+            let bestApprox = new cv.Mat();
+
+            // Find the largest 4-point contour
+            for (let i = 0; i < contours.size(); ++i) {
+              const cnt = contours.get(i);
+              const area = cv.contourArea(cnt);
+              if (area > 1000) { // filter small noise
+                const peri = cv.arcLength(cnt, true);
+                const approx = new cv.Mat();
+                // 0.02 is standard for document polygon approximation
+                cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+                
+                if (approx.rows === 4 && area > maxArea) {
+                  maxArea = area;
+                  approx.copyTo(bestApprox);
+                }
+                approx.delete();
               }
-              approx.delete();
+              cnt.delete();
             }
-            cnt.delete();
-          }
 
-          if (maxArea > 0 && bestApprox.rows === 4) {
-            const pts = [];
-            for (let i = 0; i < 4; i++) {
-              pts.push({ x: bestApprox.data32S[i * 2], y: bestApprox.data32S[i * 2 + 1] });
+            if (maxArea > 0 && bestApprox.rows === 4) {
+              const pts = [];
+              for (let i = 0; i < 4; i++) {
+                // Scale back to original resolution
+                pts.push({ 
+                  x: bestApprox.data32S[i * 2] * ratio, 
+                  y: bestApprox.data32S[i * 2 + 1] * ratio 
+                });
+              }
+              // Sort points to strictly TL, TR, BR, BL order
+              pts.sort((a, b) => a.y - b.y);
+              const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+              const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
+              defaultCorners = [top[0], top[1], bottom[0], bottom[1]];
             }
-            // Sort points: TL, TR, BR, BL
-            pts.sort((a, b) => a.y - b.y);
-            const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-            const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
-            defaultCorners = [top[0], top[1], bottom[0], bottom[1]];
-          }
 
-          mat.delete(); gray.delete(); contours.delete(); hierarchy.delete(); bestApprox.delete();
-        } catch (e) {
-          console.error("OpenCV Auto Crop Failed", e);
+            mat.delete(); downscaled.delete(); gray.delete(); 
+            kernel.delete(); contours.delete(); hierarchy.delete(); bestApprox.delete();
+          } catch (e) {
+            console.error("OpenCV Auto Crop Failed", e);
+          }
         }
-      }
-      setCorners(defaultCorners);
-      drawCropUi(img, defaultCorners);
+        setCorners(defaultCorners);
+        setIsComputingCrop(false);
+        drawCropUi(img, defaultCorners);
+      }, 300);
     };
   };
 
@@ -413,28 +442,38 @@ export default function CamScanner() {
 
         {mode === 'crop' && (
           <div className="w-full h-full flex flex-col items-center gap-4">
-            <p className="text-sm text-foreground/70 text-center font-medium">Drag the 4 blue corners to align with your document.</p>
-            <div className="relative w-full max-w-2xl border-2 border-primary/20 rounded-xl overflow-hidden touch-none" style={{ maxHeight: '60vh' }}>
-              <canvas 
-                ref={cropCanvasRef}
-                className="w-full h-auto object-contain cursor-crosshair touch-none"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                onTouchStart={handlePointerDown}
-                onTouchMove={handlePointerMove}
-                onTouchEnd={handlePointerUp}
-              />
-            </div>
-            <div className="flex gap-4">
-              <button onClick={retake} className="btn btn-outline flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" /> Retake
-              </button>
-              <button onClick={applyPerspectiveCrop} disabled={!cvReady} className="btn btn-primary flex items-center gap-2">
-                <Crop className="w-4 h-4" /> Confirm Crop
-              </button>
-            </div>
+            {isComputingCrop ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Sparkles className="w-10 h-10 text-primary animate-pulse" />
+                <h3 className="text-xl font-bold text-foreground">AI Computing Crop...</h3>
+                <p className="text-sm text-foreground/70">Scanning for document edges and correcting perspective</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-foreground/70 text-center font-medium">Drag the 4 blue corners to align with your document.</p>
+                <div className="relative w-full max-w-2xl border-2 border-primary/20 rounded-xl overflow-hidden touch-none" style={{ maxHeight: '60vh' }}>
+                  <canvas 
+                    ref={cropCanvasRef}
+                    className="w-full h-auto object-contain cursor-crosshair touch-none"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                    onTouchStart={handlePointerDown}
+                    onTouchMove={handlePointerMove}
+                    onTouchEnd={handlePointerUp}
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <button onClick={retake} className="btn btn-outline flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" /> Retake
+                  </button>
+                  <button onClick={applyPerspectiveCrop} disabled={!cvReady} className="btn btn-primary flex items-center gap-2">
+                    <Crop className="w-4 h-4" /> Confirm Crop
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
