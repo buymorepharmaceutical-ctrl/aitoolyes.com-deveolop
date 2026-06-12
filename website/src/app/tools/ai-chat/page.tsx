@@ -155,7 +155,7 @@ export default function AIChat() {
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': \`Bearer \${apiKey || 'dummy'}\`
+          'Authorization': `Bearer ${apiKey || 'dummy'}`
         }
       });
       
@@ -228,12 +228,12 @@ export default function AIChat() {
         // Direct Client-Side Fetch for Local/Ollama (Bypass Next.js server)
         const endpoint = baseUrl.endsWith('/chat/completions') 
           ? baseUrl 
-          : \`\${baseUrl.replace(/\\/$/, '')}/chat/completions\`;
+          : `${baseUrl.replace(/\/$/, '')}/chat/completions`;
           
         response = await fetch(endpoint, {
           method: 'POST',
           headers: {
-            "Authorization": \`Bearer \${apiKey || 'local'}\`,
+            "Authorization": `Bearer ${apiKey || 'local'}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({

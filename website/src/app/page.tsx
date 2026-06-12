@@ -16,7 +16,9 @@ const toolsList = [
   { name: 'Color Extractor', url: '/tools/color-extractor', icon: '🎨' },
   { name: 'JWT Decoder', url: '/tools/jwt-decoder', icon: '🔐' },
   { name: 'JSON Formatter', url: '/tools/json-formatter', icon: '{ }' },
-  { name: 'Glassmorphism UI', url: '/tools/glassmorphism-generator', icon: '🪟' },
+  { name: 'Glassmorphism UI', url: '/tools/glassmorphism-generator', icon: '🪟' }
+];
+
 export default function Home() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
