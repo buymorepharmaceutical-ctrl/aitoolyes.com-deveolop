@@ -179,17 +179,23 @@ export default function CamScanner() {
 
     try {
       const mat = cv.imread(hidden);
-      const ratio = height / 400.0; 
+      // Kickstart Optimization: Downscale heavily to 250px for lightning-fast ML Edge detection
+      const ratio = height / 250.0; 
       const downscaled = new cv.Mat();
-      cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 400));
+      cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 250));
 
       const gray = new cv.Mat();
       cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
       
+      // CLAHE Adaptive Lighting Equalizer
+      const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
+      const equalized = new cv.Mat();
+      clahe.apply(gray, equalized);
+      
       // Advanced Edge Detection: Morphological Gradient Engine
       const grad = new cv.Mat();
       const morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-      cv.morphologyEx(gray, grad, cv.MORPH_GRADIENT, morphKernel);
+      cv.morphologyEx(equalized, grad, cv.MORPH_GRADIENT, morphKernel);
       
       const bw = new cv.Mat();
       cv.threshold(grad, bw, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
@@ -313,7 +319,7 @@ export default function CamScanner() {
         stabilityHistoryRef.current = []; 
       }
 
-      mat.delete(); downscaled.delete(); gray.delete(); grad.delete(); bw.delete(); closed.delete();
+      mat.delete(); downscaled.delete(); gray.delete(); equalized.delete(); clahe.delete(); grad.delete(); bw.delete(); closed.delete();
       morphKernel.delete(); closeKernel.delete(); contours.delete(); hierarchy.delete(); 
       if (bestApprox) bestApprox.delete();
 
@@ -432,17 +438,23 @@ export default function CamScanner() {
           const width = img.width;
           const height = img.height;
           
-          const ratio = height / 500.0; 
+          // Kickstart Optimization: Downscale to 250px for rapid manual processing
+          const ratio = height / 250.0; 
           const downscaled = new cv.Mat();
-          cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 500));
+          cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 250));
 
           const gray = new cv.Mat();
           cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
           
+          // CLAHE Adaptive Lighting Equalizer
+          const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
+          const equalized = new cv.Mat();
+          clahe.apply(gray, equalized);
+          
           // Advanced Edge Detection: Morphological Gradient Engine
           const grad = new cv.Mat();
           const morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-          cv.morphologyEx(gray, grad, cv.MORPH_GRADIENT, morphKernel);
+          cv.morphologyEx(equalized, grad, cv.MORPH_GRADIENT, morphKernel);
           
           const bw = new cv.Mat();
           cv.threshold(grad, bw, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
@@ -523,7 +535,7 @@ export default function CamScanner() {
             ];
           }
 
-          mat.delete(); downscaled.delete(); gray.delete(); grad.delete(); bw.delete(); closed.delete();
+          mat.delete(); downscaled.delete(); gray.delete(); equalized.delete(); clahe.delete(); grad.delete(); bw.delete(); closed.delete();
           morphKernel.delete(); closeKernel.delete(); contours.delete(); hierarchy.delete(); 
           if (bestApprox) bestApprox.delete();
 
