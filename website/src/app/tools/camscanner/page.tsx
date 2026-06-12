@@ -5,6 +5,7 @@ import Webcam from 'react-webcam';
 import jsPDF from 'jspdf';
 import { Camera, Download, RefreshCw, FileText, Upload, Sparkles, Trash2, Plus, Image as ImageIcon, Zap, ZapOff, Grid, ChevronLeft, CheckCircle2, RotateCw, Focus, Cpu } from 'lucide-react';
 import Script from 'next/script';
+import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 declare let cv: any;
 
@@ -52,6 +53,31 @@ export default function CamScanner() {
   // Hardware State
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
+
+  // Machine Learning Hand Tracking Engine
+  const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(null);
+
+  useEffect(() => {
+    const initMediaPipe = async () => {
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        );
+        const landmarker = await HandLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+            delegate: "GPU"
+          },
+          runningMode: "VIDEO",
+          numHands: 2
+        });
+        setHandLandmarker(landmarker);
+      } catch (err) {
+        console.error("Failed to init HandLandmarker", err);
+      }
+    };
+    initMediaPipe();
+  }, []);
 
   // Auto-Capture Stabilization State
   const stabilityHistoryRef = useRef<Point[][]>([]);
@@ -121,6 +147,35 @@ export default function CamScanner() {
     if (!ctx || !overlayCtx) return;
 
     ctx.drawImage(video, 0, 0, width, height);
+
+    if (handLandmarker) {
+      try {
+        const results = handLandmarker.detectForVideo(video, performance.now());
+        if (results.landmarks) {
+          for (const landmarks of results.landmarks) {
+            for (let i = 0; i < landmarks.length; i++) {
+              const pt = landmarks[i];
+              overlayCtx.beginPath();
+              overlayCtx.arc(pt.x * width, pt.y * height, 3, 0, 2*Math.PI);
+              overlayCtx.fillStyle = "#FF3B30";
+              overlayCtx.fill();
+              
+              if (i > 0 && i % 4 !== 0) {
+                const prev = landmarks[i-1];
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(prev.x * width, prev.y * height);
+                overlayCtx.lineTo(pt.x * width, pt.y * height);
+                overlayCtx.strokeStyle = "#34C759";
+                overlayCtx.lineWidth = 2;
+                overlayCtx.stroke();
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("HandLandmarker error:", e);
+      }
+    }
 
     try {
       const mat = cv.imread(hidden);
@@ -201,10 +256,13 @@ export default function CamScanner() {
           });
         }
         
-        pts.sort((a, b) => a.y - b.y);
-        const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-        const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
-        const sortedPts = [top[0], top[1], bottom[1], bottom[0]]; // TL, TR, BR, BL
+        // Robust Geometric Sorting to prevent hourglass crossing
+        pts.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+        const tl = pts[0];
+        const br = pts[3];
+        const remaining = [pts[1], pts[2]];
+        remaining.sort((a, b) => (a.x - a.y) - (b.x - b.y));
+        const sortedPts = [tl, remaining[1], br, remaining[0]]; // TL, TR, BR, BL
 
         overlayCtx.beginPath();
         overlayCtx.moveTo(sortedPts[0].x, sortedPts[0].y);
@@ -264,7 +322,7 @@ export default function CamScanner() {
     }
 
     animationFrameIdRef.current = requestAnimationFrame(processVideoFeed);
-  }, [cvReady, mode, isComputing]);
+  }, [cvReady, mode, isComputing, handLandmarker]);
 
   useEffect(() => {
     if (mode === 'camera' && cvReady && !isComputing) {
@@ -448,10 +506,13 @@ export default function CamScanner() {
                 y: bestApprox.data32S[i * 2 + 1] * ratio 
               });
             }
-            pts.sort((a, b) => a.y - b.y);
-            const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
-            const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
-            pts = [top[0], top[1], bottom[1], bottom[0]];
+            // Robust Geometric Sorting
+            pts.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+            const tl = pts[0];
+            const br = pts[3];
+            const remaining = [pts[1], pts[2]];
+            remaining.sort((a, b) => (a.x - a.y) - (b.x - b.y));
+            pts = [tl, remaining[1], br, remaining[0]]; // TL, TR, BR, BL
           } else {
             // Default corners if AI fails to find paper
             pts = [
