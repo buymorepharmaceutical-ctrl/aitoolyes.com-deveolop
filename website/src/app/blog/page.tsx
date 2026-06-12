@@ -7,7 +7,14 @@ export const metadata = {
   description: 'Read the latest news, guides, and tutorials about Artificial Intelligence, Machine Learning, and AIToolYes platform updates.',
 };
 
-export default function BlogList() {
+export default function BlogList({ searchParams }: { searchParams: { page?: string } }) {
+  const currentPage = parseInt(searchParams.page || '1');
+  const POSTS_PER_PAGE = 6;
+  
+  const totalPages = Math.ceil(blogs.length / POSTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
+  const currentBlogs = blogs.slice(startIndex, startIndex + POSTS_PER_PAGE);
+
   return (
     <div className="min-h-screen p-6 sm:p-12 pb-32">
       <div className="max-w-4xl mx-auto space-y-12">
@@ -26,7 +33,7 @@ export default function BlogList() {
         </header>
 
         <div className="grid gap-8">
-          {blogs.map((blog) => (
+          {currentBlogs.map((blog) => (
             <Link key={blog.slug} href={`/blog/${blog.slug}`}>
               <article className="group bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-[#2e7d32]/20 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
                 <div className="flex flex-col sm:flex-row gap-6 justify-between">
@@ -59,6 +66,25 @@ export default function BlogList() {
             </Link>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-8">
+            {Array.from({ length: totalPages }).map((_, i) => {
+              const pageNumber = i + 1;
+              const isActive = pageNumber === currentPage;
+              return (
+                <Link 
+                  key={pageNumber} 
+                  href={`/blog?page=${pageNumber}`}
+                  className={`w-10 h-10 flex items-center justify-center rounded-xl font-bold transition-all ${isActive ? 'bg-[#2e7d32] text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+                >
+                  {pageNumber}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
