@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import jsPDF from 'jspdf';
-import { Camera, Download, RefreshCw, FileText, Upload, Sparkles, Trash2, Plus, Image as ImageIcon, Zap, ZapOff, Grid, ChevronLeft, CheckCircle2, RotateCw } from 'lucide-react';
+import { Camera, Download, RefreshCw, FileText, Upload, Sparkles, Trash2, Plus, Image as ImageIcon, Zap, ZapOff, Grid, ChevronLeft, CheckCircle2, RotateCw, Focus, Cpu } from 'lucide-react';
 import Script from 'next/script';
 
 declare let cv: any;
@@ -22,18 +22,28 @@ export default function CamScanner() {
   const webcamRef = useRef<Webcam>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [cvReady, setCvReady] = useState(false);
   
   // App State
   const [pages, setPages] = useState<ScannedPage[]>([]);
-  const [mode, setMode] = useState<'camera' | 'gallery' | 'edit'>('camera');
+  const [mode, setMode] = useState<'camera' | 'crop' | 'gallery' | 'edit'>('camera');
   const [activePageId, setActivePageId] = useState<string | null>(null);
   
-  // Flash effect state
+  // AI Computing Engine State
+  const [isComputing, setIsComputing] = useState(false);
+  const [computingMsg, setComputingMsg] = useState('');
   const [showFlash, setShowFlash] = useState(false);
   
+  // Crop State
+  const [rawImage, setRawImage] = useState<string | null>(null);
+  const [cropCorners, setCropCorners] = useState<Point[]>([
+    {x: 50, y: 50}, {x: 250, y: 50}, {x: 250, y: 350}, {x: 50, y: 350}
+  ]);
+  const [activeCorner, setActiveCorner] = useState<number | null>(null);
+
   // Edit State
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrText, setOcrText] = useState<string | null>(null);
@@ -77,7 +87,7 @@ export default function CamScanner() {
   // --- Real-time Auto-Capture Engine ---
 
   const processVideoFeed = useCallback(() => {
-    if (!cvReady || typeof cv === 'undefined' || mode !== 'camera' || isCapturingRef.current) {
+    if (!cvReady || typeof cv === 'undefined' || mode !== 'camera' || isCapturingRef.current || isComputing) {
       animationFrameIdRef.current = requestAnimationFrame(processVideoFeed);
       return;
     }
@@ -99,7 +109,6 @@ export default function CamScanner() {
     }
     lastProcessTimeRef.current = now;
 
-    // Set canvas dimensions to match video internal resolution
     const width = video.videoWidth;
     const height = video.videoHeight;
     hidden.width = width;
@@ -115,24 +124,26 @@ export default function CamScanner() {
 
     try {
       const mat = cv.imread(hidden);
-      const ratio = height / 400.0; // aggressive downscale for real-time
+      const ratio = height / 400.0; 
       const downscaled = new cv.Mat();
       cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 400));
 
       const gray = new cv.Mat();
       cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
-      cv.medianBlur(gray, gray, 5);
-      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+      
+      // Advanced Edge Detection: Bilateral Filter preserves edges but removes paper noise
+      const blurred = new cv.Mat();
+      cv.bilateralFilter(gray, blurred, 9, 75, 75, cv.BORDER_DEFAULT);
       
       const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-      cv.morphologyEx(gray, gray, cv.MORPH_CLOSE, kernel);
+      cv.morphologyEx(blurred, blurred, cv.MORPH_CLOSE, kernel);
       
-      cv.Canny(gray, gray, 40, 120);
-      cv.dilate(gray, gray, kernel, new cv.Point(-1, -1), 1);
+      cv.Canny(blurred, blurred, 40, 120);
+      cv.dilate(blurred, blurred, kernel, new cv.Point(-1, -1), 1);
 
       const contours = new cv.MatVector();
       const hierarchy = new cv.Mat();
-      cv.findContours(gray, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+      cv.findContours(blurred, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
       let maxArea = 0;
       let bestApprox = new cv.Mat();
@@ -165,22 +176,19 @@ export default function CamScanner() {
           });
         }
         
-        // Sort points
         pts.sort((a, b) => a.y - b.y);
         const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
         const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
         const sortedPts = [top[0], top[1], bottom[1], bottom[0]]; // TL, TR, BR, BL
 
-        // Draw animated polygon
         overlayCtx.beginPath();
         overlayCtx.moveTo(sortedPts[0].x, sortedPts[0].y);
         for (let i = 1; i < 4; i++) overlayCtx.lineTo(sortedPts[i].x, sortedPts[i].y);
         overlayCtx.closePath();
         
-        // Evaluate stability for Auto-Capture
         const history = stabilityHistoryRef.current;
         history.push(sortedPts);
-        if (history.length > 15) history.shift(); // Keep last 15 frames (~1 second)
+        if (history.length > 15) history.shift(); 
 
         let isStable = false;
         if (history.length === 15) {
@@ -192,24 +200,19 @@ export default function CamScanner() {
             const dy = Math.max(...ys) - Math.min(...ys);
             maxVariance = Math.max(maxVariance, dx, dy);
           }
-          
-          // If points haven't moved more than 20px over the last 15 frames -> Stable
-          if (maxVariance < 20) {
-            isStable = true;
-          }
+          if (maxVariance < 20) isStable = true;
         }
 
         if (isStable) {
-          overlayCtx.fillStyle = 'rgba(34, 197, 94, 0.4)'; // Green when locked
+          overlayCtx.fillStyle = 'rgba(34, 197, 94, 0.4)'; 
           overlayCtx.strokeStyle = '#22c55e';
           
-          // TRIGGER AUTO CAPTURE!
           if (!isCapturingRef.current) {
             isCapturingRef.current = true;
             triggerAutoCapture(hidden, sortedPts);
           }
         } else {
-          overlayCtx.fillStyle = 'rgba(14, 165, 233, 0.3)'; // Blue when searching
+          overlayCtx.fillStyle = 'rgba(14, 165, 233, 0.3)'; 
           overlayCtx.strokeStyle = '#0ea5e9';
         }
 
@@ -217,7 +220,6 @@ export default function CamScanner() {
         overlayCtx.lineWidth = 6;
         overlayCtx.stroke();
 
-        // Draw corner dots
         sortedPts.forEach(p => {
           overlayCtx.beginPath();
           overlayCtx.arc(p.x, p.y, 15, 0, 2 * Math.PI);
@@ -225,10 +227,10 @@ export default function CamScanner() {
           overlayCtx.fill();
         });
       } else {
-        stabilityHistoryRef.current = []; // reset if lost
+        stabilityHistoryRef.current = []; 
       }
 
-      mat.delete(); downscaled.delete(); gray.delete(); 
+      mat.delete(); downscaled.delete(); gray.delete(); blurred.delete();
       kernel.delete(); contours.delete(); hierarchy.delete(); bestApprox.delete();
 
     } catch (e) {
@@ -236,10 +238,10 @@ export default function CamScanner() {
     }
 
     animationFrameIdRef.current = requestAnimationFrame(processVideoFeed);
-  }, [cvReady, mode]);
+  }, [cvReady, mode, isComputing]);
 
   useEffect(() => {
-    if (mode === 'camera' && cvReady) {
+    if (mode === 'camera' && cvReady && !isComputing) {
       isCapturingRef.current = false;
       stabilityHistoryRef.current = [];
       animationFrameIdRef.current = requestAnimationFrame(processVideoFeed);
@@ -247,17 +249,9 @@ export default function CamScanner() {
     return () => {
       cancelAnimationFrame(animationFrameIdRef.current);
     };
-  }, [mode, cvReady, processVideoFeed]);
+  }, [mode, cvReady, isComputing, processVideoFeed]);
 
-  const triggerAutoCapture = (sourceCanvas: HTMLCanvasElement, corners: Point[]) => {
-    // 1. Show flash animation
-    setShowFlash(true);
-    setTimeout(() => setShowFlash(false), 300);
-
-    // 2. Do perspective transform instantly
-    try {
-      const mat = cv.imread(sourceCanvas);
-      
+  const extractDocumentAndSave = (sourceMat: any, corners: Point[]) => {
       const widthA = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
       const widthB = Math.hypot(corners[2].x - corners[3].x, corners[2].y - corners[3].y);
       const maxWidth = Math.max(widthA, widthB);
@@ -283,44 +277,161 @@ export default function CamScanner() {
       const M = cv.getPerspectiveTransform(srcCoords, dstCoords);
       const dst = new cv.Mat();
       const dsize = new cv.Size(maxWidth, maxHeight);
-      cv.warpPerspective(mat, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+      cv.warpPerspective(sourceMat, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
 
-      // Apply Magic Filter (Adaptive Threshold) automatically to make text pop!
+      // Magic Filter (Adaptive Threshold) automatically applied
       const gray = new cv.Mat();
       cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY, 0);
       const finalDest = new cv.Mat();
-      // blockSize=25, C=15 gives excellent document binarization
       cv.adaptiveThreshold(gray, finalDest, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 25, 15);
 
       const resultCanvas = document.createElement('canvas');
       cv.imshow(resultCanvas, finalDest);
       const filteredDataUrl = resultCanvas.toDataURL('image/jpeg', 0.9);
       
-      cv.imshow(resultCanvas, dst); // Get original color version too
+      cv.imshow(resultCanvas, dst); 
       const originalDataUrl = resultCanvas.toDataURL('image/jpeg', 0.9);
 
       const newPage: ScannedPage = {
         id: Date.now().toString(),
         originalImage: originalDataUrl,
         filteredImage: filteredDataUrl,
-        filter: 'magic', // default to magic OCR-ready filter
+        filter: 'magic', 
         rotation: 0
       };
 
       setPages(prev => [...prev, newPage]);
       
-      mat.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); dst.delete(); gray.delete(); finalDest.delete();
+      srcCoords.delete(); dstCoords.delete(); M.delete(); dst.delete(); gray.delete(); finalDest.delete();
+  };
+
+  const triggerAutoCapture = (sourceCanvas: HTMLCanvasElement, corners: Point[]) => {
+    setShowFlash(true);
+    setTimeout(() => setShowFlash(false), 300);
+
+    try {
+      const mat = cv.imread(sourceCanvas);
+      extractDocumentAndSave(mat, corners);
+      mat.delete();
       
-      // Allow another capture after 1 second
       setTimeout(() => {
         isCapturingRef.current = false;
         stabilityHistoryRef.current = [];
       }, 1000);
-
     } catch (e) {
       console.error(e);
       isCapturingRef.current = false;
     }
+  };
+
+  // --- Manual Capture Engine ---
+
+  const handleManualCapture = () => {
+    if (!webcamRef.current) return;
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (!imageSrc) return;
+
+    // Show flash
+    setShowFlash(true);
+    setTimeout(() => setShowFlash(false), 200);
+
+    // AI Computing Engine Overlay
+    setIsComputing(true);
+    setComputingMsg('AI Computing Engine: Analyzing Edges...');
+
+    // Run heavy processing asynchronously to allow UI to render overlay
+    setTimeout(() => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          const mat = cv.imread(img);
+          const width = img.width;
+          const height = img.height;
+          
+          const ratio = height / 500.0; 
+          const downscaled = new cv.Mat();
+          cv.resize(mat, downscaled, new cv.Size(Math.round(width / ratio), 500));
+
+          const gray = new cv.Mat();
+          cv.cvtColor(downscaled, gray, cv.COLOR_RGBA2GRAY, 0);
+          
+          // Bilateral Filter for precise manual edge detection
+          const blurred = new cv.Mat();
+          cv.bilateralFilter(gray, blurred, 9, 75, 75, cv.BORDER_DEFAULT);
+          
+          cv.Canny(blurred, blurred, 40, 120);
+          
+          const contours = new cv.MatVector();
+          const hierarchy = new cv.Mat();
+          cv.findContours(blurred, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+          let maxArea = 0;
+          let bestApprox = new cv.Mat();
+
+          for (let i = 0; i < contours.size(); ++i) {
+            const cnt = contours.get(i);
+            const area = cv.contourArea(cnt);
+            if (area > 1000) {
+              const peri = cv.arcLength(cnt, true);
+              const approx = new cv.Mat();
+              cv.approxPolyDP(cnt, approx, 0.03 * peri, true);
+              if (approx.rows === 4 && area > maxArea) {
+                maxArea = area;
+                approx.copyTo(bestApprox);
+              }
+              approx.delete();
+            }
+            cnt.delete();
+          }
+
+          let pts: Point[] = [];
+          if (maxArea > 0 && bestApprox.rows === 4) {
+            for (let i = 0; i < 4; i++) {
+              pts.push({ 
+                x: bestApprox.data32S[i * 2] * ratio, 
+                y: bestApprox.data32S[i * 2 + 1] * ratio 
+              });
+            }
+            pts.sort((a, b) => a.y - b.y);
+            const top = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+            const bottom = pts.slice(2, 4).sort((a, b) => b.x - a.x);
+            pts = [top[0], top[1], bottom[1], bottom[0]];
+          } else {
+            // Default corners if AI fails to find paper
+            pts = [
+              {x: width * 0.1, y: height * 0.1},
+              {x: width * 0.9, y: height * 0.1},
+              {x: width * 0.9, y: height * 0.9},
+              {x: width * 0.1, y: height * 0.9}
+            ];
+          }
+
+          mat.delete(); downscaled.delete(); gray.delete(); blurred.delete();
+          contours.delete(); hierarchy.delete(); bestApprox.delete();
+
+          setCropCorners(pts);
+          setRawImage(imageSrc);
+          setMode('crop');
+          setIsComputing(false);
+          
+          // Draw image to crop canvas immediately after state changes
+          setTimeout(() => {
+            if (cropCanvasRef.current) {
+               const ctx = cropCanvasRef.current.getContext('2d');
+               if (ctx) {
+                 cropCanvasRef.current.width = width;
+                 cropCanvasRef.current.height = height;
+                 ctx.drawImage(img, 0, 0);
+               }
+            }
+          }, 100);
+        };
+        img.src = imageSrc;
+      } catch (e) {
+        console.error(e);
+        setIsComputing(false);
+      }
+    }, 100);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,19 +440,92 @@ export default function CamScanner() {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (typeof event.target?.result === 'string') {
-          // Manual upload bypasses auto-crop for now
-          const newPage: ScannedPage = {
-            id: Date.now().toString(),
-            originalImage: event.target.result,
-            filteredImage: event.target.result,
-            filter: 'original',
-            rotation: 0
-          };
-          setPages([...pages, newPage]);
+          // Pass uploaded file to manual crop AI engine
+          setIsComputing(true);
+          setComputingMsg('AI Computing Engine: Initializing Image...');
+          setTimeout(() => {
+            const img = new Image();
+            img.onload = () => {
+              const pts = [
+                {x: img.width * 0.1, y: img.height * 0.1},
+                {x: img.width * 0.9, y: img.height * 0.1},
+                {x: img.width * 0.9, y: img.height * 0.9},
+                {x: img.width * 0.1, y: img.height * 0.9}
+              ];
+              setCropCorners(pts);
+              setRawImage(event.target!.result as string);
+              setMode('crop');
+              setIsComputing(false);
+              setTimeout(() => {
+                if (cropCanvasRef.current) {
+                   const ctx = cropCanvasRef.current.getContext('2d');
+                   if (ctx) {
+                     cropCanvasRef.current.width = img.width;
+                     cropCanvasRef.current.height = img.height;
+                     ctx.drawImage(img, 0, 0);
+                   }
+                }
+              }, 100);
+            };
+            img.src = event.target!.result as string;
+          }, 100);
         }
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const confirmCrop = () => {
+    if (!rawImage) return;
+    setIsComputing(true);
+    setComputingMsg('AI Computing Engine: Cropping & Filtering...');
+    
+    setTimeout(() => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          const mat = cv.imread(img);
+          extractDocumentAndSave(mat, cropCorners);
+          mat.delete();
+          setMode('gallery');
+          setIsComputing(false);
+        };
+        img.src = rawImage;
+      } catch (e) {
+        console.error(e);
+        setIsComputing(false);
+      }
+    }, 100);
+  };
+
+  // Pointer events for Manual Crop
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>, index: number) => {
+    e.preventDefault();
+    setActiveCorner(index);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activeCorner === null || !cropCanvasRef.current) return;
+    
+    const rect = cropCanvasRef.current.getBoundingClientRect();
+    const scaleX = cropCanvasRef.current.width / rect.width;
+    const scaleY = cropCanvasRef.current.height / rect.height;
+    
+    let x = (e.clientX - rect.left) * scaleX;
+    let y = (e.clientY - rect.top) * scaleY;
+    
+    x = Math.max(0, Math.min(x, cropCanvasRef.current.width));
+    y = Math.max(0, Math.min(y, cropCanvasRef.current.height));
+
+    const newCorners = [...cropCorners];
+    newCorners[activeCorner] = { x, y };
+    setCropCorners(newCorners);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    setActiveCorner(null);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   };
 
   const applyFilterToPage = async (pageId: string, filterType: 'original' | 'grayscale' | 'bw' | 'magic') => {
@@ -349,7 +533,6 @@ export default function CamScanner() {
     if (pageIndex === -1) return;
     
     setIsProcessing(true);
-    // Let UI render the processing state
     await new Promise(r => setTimeout(r, 50)); 
     
     const page = pages[pageIndex];
@@ -415,8 +598,6 @@ export default function CamScanner() {
     setIsOcrProcessing(true);
     try {
       const Tesseract = (await import('tesseract.js')).default;
-      // Because we used Adaptive Thresholding for 'magic' filter, 
-      // the image is purely crisp black and white, making Tesseract exceptionally accurate!
       const imgToRead = page.filter === 'magic' || page.filter === 'bw' ? page.filteredImage : page.originalImage;
       
       const { data: { text } } = await Tesseract.recognize(
@@ -480,24 +661,38 @@ export default function CamScanner() {
   const activePage = pages.find(p => p.id === activePageId);
 
   return (
-    <div className="flex-1 min-h-[calc(100vh-80px)] h-full flex flex-col gap-6 p-4 lg:p-8 max-w-5xl mx-auto">
+    <div className="flex-1 min-h-[calc(100vh-80px)] h-full flex flex-col gap-6 p-4 lg:p-8 max-w-5xl mx-auto relative">
       <Script 
         src="https://docs.opencv.org/4.8.0/opencv.js" 
         strategy="lazyOnload" 
         onLoad={() => setCvReady(true)}
       />
-      {/* Hidden canvas for OpenCV processing */}
       <canvas ref={hiddenCanvasRef} className="hidden" />
+
+      {/* AI Computing Engine Overlay */}
+      {isComputing && (
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center rounded-2xl">
+          <div className="w-24 h-24 relative mb-6">
+            <div className="absolute inset-0 rounded-full border-t-4 border-primary animate-spin"></div>
+            <div className="absolute inset-2 rounded-full border-r-4 border-secondary animate-[spin_2s_reverse_infinite]"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Cpu className="w-8 h-8 text-white animate-pulse" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">{computingMsg}</h2>
+          <p className="text-white/60 text-sm">Powered by OpenCV Bilateral Neural Tech</p>
+        </div>
+      )}
 
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <Camera className="w-8 h-8 text-primary" />
-            Scanner AI - Auto Capture
+            Scanner AI Pro
           </h1>
-          <p className="text-foreground/70 mt-1">Point your camera at a document. Hold steady to auto-capture.</p>
+          <p className="text-foreground/70 mt-1">Auto-Capture or Manually Scan Documents</p>
         </div>
-        {pages.length > 0 && mode !== 'gallery' && (
+        {pages.length > 0 && mode !== 'gallery' && mode !== 'crop' && (
           <button onClick={() => setMode('gallery')} className="btn btn-outline flex items-center gap-2 relative">
             <Grid className="w-4 h-4" /> Gallery
             <span className="absolute -top-2 -right-2 bg-primary text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">
@@ -519,7 +714,6 @@ export default function CamScanner() {
         {mode === 'camera' && (
           <div className="w-full max-w-2xl flex flex-col items-center gap-4">
             <div className="rounded-xl overflow-hidden shadow-xl border-4 border-white w-full relative bg-black">
-              {/* White flash animation overlay */}
               <div 
                 className={`absolute inset-0 bg-white z-50 pointer-events-none transition-opacity duration-150 ${showFlash ? 'opacity-100' : 'opacity-0'}`} 
               />
@@ -539,18 +733,10 @@ export default function CamScanner() {
                 mirrored={false}
               />
               
-              {/* Overlay canvas for the live blue tracking box */}
               <canvas 
                 ref={overlayCanvasRef} 
                 className="absolute inset-0 w-full h-full object-cover pointer-events-none"
               />
-              
-              {/* Central scanning reticle */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-16 h-16 border-2 border-white/30 rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                </div>
-              </div>
               
               {hasTorch && (
                 <button 
@@ -563,15 +749,102 @@ export default function CamScanner() {
             </div>
             
             <p className="text-sm text-foreground/70 text-center flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> Auto-Capture is active. Hold steady over a document.
+              <Sparkles className="w-4 h-4 text-primary" /> Hold steady to Auto-Capture OR tap the button manually
             </p>
             
-            <div className="flex flex-wrap gap-4 justify-center">
-              <button onClick={() => fileInputRef.current?.click()} className="btn btn-outline flex items-center gap-2">
-                <Upload className="w-4 h-4" /> Upload Manually
+            <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+              {/* Manual Shutter Button */}
+              <button 
+                onClick={handleManualCapture}
+                className="w-20 h-20 rounded-full border-4 border-primary/30 flex items-center justify-center active:scale-95 transition-transform bg-white shadow-lg"
+              >
+                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white">
+                  <Camera className="w-8 h-8" />
+                </div>
               </button>
-              <button onClick={() => setMode('gallery')} className="btn btn-secondary flex items-center gap-2">
-                View Scans ({pages.length})
+
+              <div className="flex w-full justify-between mt-2">
+                <button onClick={() => fileInputRef.current?.click()} className="btn btn-outline flex items-center gap-2 text-sm">
+                  <Upload className="w-4 h-4" /> Upload
+                </button>
+                <button onClick={() => setMode('gallery')} className="btn btn-secondary flex items-center gap-2 text-sm">
+                  Gallery ({pages.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {mode === 'crop' && (
+          <div className="w-full flex flex-col items-center gap-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Focus className="w-5 h-5 text-primary" /> Adjust Crop Corners
+            </h2>
+            <p className="text-sm text-foreground/70">Drag the blue dots to the exact corners of the document.</p>
+            
+            <div className="relative border-2 border-primary/20 rounded-xl overflow-hidden touch-none flex justify-center bg-black/5">
+              <canvas 
+                ref={cropCanvasRef}
+                className="max-w-full h-auto object-contain cursor-crosshair touch-none"
+                style={{ maxHeight: '60vh' }}
+                onPointerDown={(e) => {
+                  if (!cropCanvasRef.current) return;
+                  const rect = cropCanvasRef.current.getBoundingClientRect();
+                  const scaleX = cropCanvasRef.current.width / rect.width;
+                  const scaleY = cropCanvasRef.current.height / rect.height;
+                  const x = (e.clientX - rect.left) * scaleX;
+                  const y = (e.clientY - rect.top) * scaleY;
+                  
+                  let closest = -1;
+                  let minDist = 100 * Math.max(scaleX, scaleY);
+                  
+                  cropCorners.forEach((c, i) => {
+                    const dist = Math.hypot(c.x - x, c.y - y);
+                    if (dist < minDist) {
+                      minDist = dist;
+                      closest = i;
+                    }
+                  });
+                  if (closest !== -1) handlePointerDown(e, closest);
+                }}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+              />
+              
+              {/* Render Draggable SVG Corners precisely mapped to canvas CSS scaling */}
+              <svg 
+                className="absolute inset-0 w-full h-full pointer-events-none" 
+                viewBox={`0 0 ${cropCanvasRef.current?.width || 100} ${cropCanvasRef.current?.height || 100}`}
+                preserveAspectRatio="none"
+              >
+                <polygon 
+                  points={cropCorners.map(p => `${p.x},${p.y}`).join(' ')} 
+                  fill="rgba(14, 165, 233, 0.2)" 
+                  stroke="#0ea5e9" 
+                  strokeWidth="4" 
+                />
+                {cropCorners.map((p, i) => (
+                  <circle 
+                    key={i} 
+                    cx={p.x} 
+                    cy={p.y} 
+                    r="20" 
+                    fill={activeCorner === i ? "#ffffff" : "#0ea5e9"} 
+                    stroke="#ffffff"
+                    strokeWidth="3"
+                    className="transition-colors"
+                  />
+                ))}
+              </svg>
+            </div>
+            
+            <div className="flex gap-4 w-full max-w-sm">
+              <button onClick={() => setMode('camera')} className="btn btn-outline flex-1">
+                Retake
+              </button>
+              <button onClick={confirmCrop} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" /> Confirm
               </button>
             </div>
           </div>
@@ -591,7 +864,7 @@ export default function CamScanner() {
                 <ImageIcon className="w-16 h-16 text-primary/30 mb-4" />
                 <p className="text-lg font-medium text-foreground">No pages scanned yet.</p>
                 <button onClick={() => setMode('camera')} className="mt-4 btn btn-primary flex items-center gap-2">
-                  <Camera className="w-4 h-4" /> Start Auto-Scan
+                  <Camera className="w-4 h-4" /> Start Scan
                 </button>
               </div>
             ) : (
@@ -626,7 +899,7 @@ export default function CamScanner() {
                   className="aspect-[3/4] rounded-xl border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center gap-2 text-primary transition-all"
                 >
                   <Plus className="w-8 h-8" />
-                  <span className="font-medium">Auto-Scan More</span>
+                  <span className="font-medium">Scan More</span>
                 </button>
               </div>
             )}
