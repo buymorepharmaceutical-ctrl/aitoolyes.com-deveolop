@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   title: "Free AI Tools Suite - No Signup, 100% Private | AIToolYes",
   description: "The ultimate all-in-one AI platform for free. Access ATS Resume Checkers, Browser PDF Scanners, SEO Analyzers, and more. No signup required, zero cloud uploads.",
   keywords: "free AI tools, all-in-one AI platform for free, no signup AI generator, on-device AI tools, browser pdf scanner, free ats resume checker, privacy first AI, ATS resume checker online free, camscanner alternative web, AI developer tools no login, machine learning in browser, AIToolYes",
+  metadataBase: new URL("https://aitoolyes.com"),
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
@@ -50,9 +51,6 @@ export const viewport: Viewport = {
 
 import Link from 'next/link';
 import Image from 'next/image';
-import AdsProvider from '@/components/AdsProvider';
-import AdSlot from '@/components/AdSlot';
-import GlobalOnboarding from '@/components/GlobalOnboarding';
 import { GlobalAIProvider } from '@/components/GlobalAIContext';
 import { AIChatWrapper } from '@/components/AIChatWrapper';
 
@@ -128,7 +126,6 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] flex flex-col items-center p-2 md:p-8 pb-24 md:pb-8 relative">
         <GlobalAIProvider>
-          <GlobalOnboarding />
           {/* Animated Background */}
           <div className="fixed inset-0 z-[-1] overflow-hidden bg-[#0a0a0a]">
             <div className="absolute inset-0 opacity-100" style={{
@@ -147,7 +144,6 @@ export default function RootLayout({
             <div className="absolute inset-0 bg-black/30" />
           </div>
           
-          <AdsProvider />
           {/* Main Dashboard Container */}
           <div className="w-full max-w-6xl flex-1 flex flex-col glass-panel bento-card relative z-10 min-h-[calc(100vh-2rem)]">
             {/* Header/Navbar */}
@@ -170,7 +166,6 @@ export default function RootLayout({
             
             {/* Page Content */}
             <main className="flex-1 flex flex-col p-3 md:p-8 relative">
-              <AdSlot />
               {children}
             </main>
           </div>
