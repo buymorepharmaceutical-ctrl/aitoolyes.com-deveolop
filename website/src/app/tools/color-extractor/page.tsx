@@ -114,56 +114,58 @@ export default function AdvancedColorExtractor() {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
       
-      // Fast K-Means Clustering for Dominant Colors
-      const k = 6;
-      let centroids: {r: number, g: number, b: number}[] = [];
-      const pixelStep = 40; // Sample every 10th pixel for speed
-      
-      // 1. Initialize random centroids from actual image pixels
-      for (let i = 0; i < k; i++) {
-        let idx = Math.floor(Math.random() * (data.length / 4)) * 4;
-        centroids.push({ r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+      // A more robust frequency-based color quantization
+      const colorCounts = new Map<string, {r: number, g: number, b: number, count: number}>();
+      const pixelStep = 4 * 10; // Sample every 10th pixel for speed
+
+      for (let i = 0; i < data.length; i += pixelStep) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        
+        if (a < 128) continue; // Skip transparent
+        
+        // Quantize colors (e.g., bin size of 16) to group similar colors
+        const binSize = 16;
+        const qr = Math.floor(r / binSize) * binSize + (binSize / 2);
+        const qg = Math.floor(g / binSize) * binSize + (binSize / 2);
+        const qb = Math.floor(b / binSize) * binSize + (binSize / 2);
+        
+        const key = `${qr},${qg},${qb}`;
+        if (!colorCounts.has(key)) {
+          colorCounts.set(key, { r: qr, g: qg, b: qb, count: 1 });
+        } else {
+          colorCounts.get(key)!.count++;
+        }
       }
 
-      // 2. Run K-Means for a few iterations
-      for (let iter = 0; iter < 5; iter++) {
-        const clusters = Array.from({ length: k }, () => ({ r: 0, g: 0, b: 0, count: 0 }));
+      // Sort by frequency
+      const sortedColors = Array.from(colorCounts.values()).sort((a, b) => b.count - a.count);
+      
+      // Filter out similar colors to ensure a diverse palette
+      const finalColors: {r: number, g: number, b: number}[] = [];
+      const minDistance = 50; // Minimum RGB distance between distinct palette colors
+      
+      for (const color of sortedColors) {
+        if (finalColors.length >= 6) break;
         
-        for (let i = 0; i < data.length; i += pixelStep) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const a = data[i + 3];
-          
-          if (a < 128) continue; // Skip transparent
-          
-          // Find closest centroid (using Manhattan distance for speed)
-          let minDist = Infinity;
-          let minIdx = 0;
-          for (let j = 0; j < k; j++) {
-            const dist = Math.abs(r - centroids[j].r) + Math.abs(g - centroids[j].g) + Math.abs(b - centroids[j].b);
-            if (dist < minDist) {
-              minDist = dist;
-              minIdx = j;
-            }
+        let isDistinct = true;
+        for (const fc of finalColors) {
+          const dist = Math.sqrt(Math.pow(color.r - fc.r, 2) + Math.pow(color.g - fc.g, 2) + Math.pow(color.b - fc.b, 2));
+          if (dist < minDistance) {
+            isDistinct = false;
+            break;
           }
-          
-          clusters[minIdx].r += r;
-          clusters[minIdx].g += g;
-          clusters[minIdx].b += b;
-          clusters[minIdx].count++;
         }
         
-        // Update centroids
-        centroids = clusters.map(c => 
-          c.count === 0 
-            ? { r: Math.floor(Math.random() * 255), g: Math.floor(Math.random() * 255), b: Math.floor(Math.random() * 255) } 
-            : { r: Math.round(c.r / c.count), g: Math.round(c.g / c.count), b: Math.round(c.b / c.count) }
-        );
+        if (isDistinct) {
+          finalColors.push(color);
+        }
       }
 
-      // Sort by perceived luminance to create a nice gradient palette
-      const hexColors = centroids.sort((a, b) => {
+      // Sort final colors by perceived luminance to create a nice gradient palette
+      const hexColors = finalColors.sort((a, b) => {
         const lumA = a.r * 0.299 + a.g * 0.587 + a.b * 0.114;
         const lumB = b.r * 0.299 + b.g * 0.587 + b.b * 0.114;
         return lumA - lumB;

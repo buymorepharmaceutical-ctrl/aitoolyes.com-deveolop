@@ -16,7 +16,8 @@ const toolsList = [
   { name: 'Color Extractor', url: '/tools/color-extractor', icon: '🎨' },
   { name: 'JWT Decoder', url: '/tools/jwt-decoder', icon: '🔐' },
   { name: 'JSON Formatter', url: '/tools/json-formatter', icon: '{ }' },
-  { name: 'Glassmorphism UI', url: '/tools/glassmorphism-generator', icon: '🪟' }
+  { name: 'Glassmorphism UI', url: '/tools/glassmorphism-generator', icon: '🪟' },
+  { name: 'Private Search Engine', url: '/tools/private-search', icon: '🦆' }
 ];
 
 export default function Home() {
@@ -351,6 +352,18 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-semibold mb-2">SQL Formatter</h3>
               <p className="text-foreground/70">Beautify and format messy SQL queries to make them readable.</p>
+            </div>
+          </Link>
+
+          {/* Tool Card 20 */}
+          <Link href="/tools/private-search">
+            <div className="p-6 rounded-2xl bg-white/40 border border-white/50 hover:bg-white/60 transition-colors cursor-pointer group h-full relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">NEW</div>
+              <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <span className="text-emerald-700 font-bold text-xl">🦆</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Private Search Engine</h3>
+              <p className="text-foreground/70">A tracker-free search engine powered by DuckDuckGo without any ads.</p>
             </div>
           </Link>
 

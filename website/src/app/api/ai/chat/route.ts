@@ -20,6 +20,23 @@ const AI_TOOLS = [
         required: ["url"],
       },
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_web",
+      description: "Perform a live web search using DuckDuckGo to find real-time information, news, or answer factual questions. Use this when the user asks a question about recent events or facts you don't know.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "The search query to look up on DuckDuckGo.",
+          },
+        },
+        required: ["query"],
+      },
+    }
   }
 ];
 
@@ -33,6 +50,20 @@ async function executeTool(name: string, args: any, req: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: args.url })
+      });
+      const data = await res.json();
+      return JSON.stringify(data);
+    } catch (e: any) {
+      return JSON.stringify({ error: e.message });
+    }
+  }
+  if (name === 'search_web') {
+    try {
+      const searchUrl = new URL('/api/search', req.url).toString();
+      const res = await fetch(searchUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: args.query })
       });
       const data = await res.json();
       return JSON.stringify(data);
