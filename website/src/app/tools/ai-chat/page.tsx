@@ -41,6 +41,7 @@ export default function AIChat() {
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('https://api.openai.com/v1');
   const [modelName, setModelName] = useState('gpt-4o');
+  const [activeProvider, setActiveProvider] = useState<string | null>(null);
   
   // Connection Testing
   const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -279,6 +280,8 @@ export default function AIChat() {
       if (!response.ok) throw new Error('API Error');
 
       const data = await response.json();
+      if (data.provider) setActiveProvider(data.provider);
+      
       const assistantMessage = isLocal ? data.choices[0].message.content : data.response;
       
       const finalMessages = [...newMessages, { role: 'assistant', content: assistantMessage }] as Message[];
@@ -389,7 +392,9 @@ export default function AIChat() {
             </motion.div>
             <div>
               <h1 className="font-bold text-lg text-foreground leading-tight">AI ToolYes</h1>
-              <p className="text-xs text-foreground/60">{apiKey ? `Powered by ${modelName}` : 'Powered by Cloud Engine'}</p>
+              <p className="text-xs text-foreground/60">
+                {activeProvider ? `Powered by ${activeProvider}` : (apiKey ? `Powered by ${modelName}` : 'Powered by Cloud Engine')}
+              </p>
             </div>
           </div>
           <button 

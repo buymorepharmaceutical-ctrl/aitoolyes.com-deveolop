@@ -192,17 +192,16 @@ export default function CamScanner() {
       const equalized = new cv.Mat();
       clahe.apply(gray, equalized);
       
-      // Advanced Edge Detection: Morphological Gradient Engine
-      const grad = new cv.Mat();
-      const morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-      cv.morphologyEx(equalized, grad, cv.MORPH_GRADIENT, morphKernel);
+      // Advanced Edge Detection: Gaussian Blur + Canny
+      const blurred = new cv.Mat();
+      cv.GaussianBlur(equalized, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
       
-      const bw = new cv.Mat();
-      cv.threshold(grad, bw, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+      const edges = new cv.Mat();
+      cv.Canny(blurred, edges, 75, 200);
       
       const closed = new cv.Mat();
-      const closeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
-      cv.morphologyEx(bw, closed, cv.MORPH_CLOSE, closeKernel);
+      const closeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+      cv.dilate(edges, closed, closeKernel);
 
       const contours = new cv.MatVector();
       const hierarchy = new cv.Mat();
@@ -320,8 +319,8 @@ export default function CamScanner() {
         stabilityHistoryRef.current = []; 
       }
 
-      mat.delete(); downscaled.delete(); gray.delete(); equalized.delete(); clahe.delete(); grad.delete(); bw.delete(); closed.delete();
-      morphKernel.delete(); closeKernel.delete(); contours.delete(); hierarchy.delete(); 
+      mat.delete(); downscaled.delete(); gray.delete(); equalized.delete(); clahe.delete(); blurred.delete(); edges.delete(); closed.delete();
+      closeKernel.delete(); contours.delete(); hierarchy.delete(); 
       if (bestApprox) bestApprox.delete();
 
     } catch (e) {
@@ -453,17 +452,16 @@ export default function CamScanner() {
           const equalized = new cv.Mat();
           clahe.apply(gray, equalized);
           
-          // Advanced Edge Detection: Morphological Gradient Engine
-          const grad = new cv.Mat();
-          const morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-          cv.morphologyEx(equalized, grad, cv.MORPH_GRADIENT, morphKernel);
+          // Advanced Edge Detection: Gaussian Blur + Canny
+          const blurred = new cv.Mat();
+          cv.GaussianBlur(equalized, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
           
-          const bw = new cv.Mat();
-          cv.threshold(grad, bw, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+          const edges = new cv.Mat();
+          cv.Canny(blurred, edges, 75, 200);
           
           const closed = new cv.Mat();
-          const closeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
-          cv.morphologyEx(bw, closed, cv.MORPH_CLOSE, closeKernel);
+          const closeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+          cv.dilate(edges, closed, closeKernel);
 
           const contours = new cv.MatVector();
           const hierarchy = new cv.Mat();
@@ -538,8 +536,8 @@ export default function CamScanner() {
             ];
           }
 
-          mat.delete(); downscaled.delete(); gray.delete(); equalized.delete(); clahe.delete(); grad.delete(); bw.delete(); closed.delete();
-          morphKernel.delete(); closeKernel.delete(); contours.delete(); hierarchy.delete(); 
+          mat.delete(); downscaled.delete(); gray.delete(); equalized.delete(); clahe.delete(); blurred.delete(); edges.delete(); closed.delete();
+          closeKernel.delete(); contours.delete(); hierarchy.delete(); 
           if (bestApprox) bestApprox.delete();
 
           setCropCorners(pts);
