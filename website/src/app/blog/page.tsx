@@ -7,8 +7,9 @@ export const metadata = {
   description: 'Read the latest news, guides, and tutorials about Artificial Intelligence, Machine Learning, and AIToolYes platform updates.',
 };
 
-export default function BlogList({ searchParams }: { searchParams: { page?: string } }) {
-  const currentPage = parseInt(searchParams.page || '1');
+export default async function BlogList({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const { page } = await searchParams;
+  const currentPage = parseInt(page || '1');
   const POSTS_PER_PAGE = 6;
   
   const totalPages = Math.ceil(blogs.length / POSTS_PER_PAGE);

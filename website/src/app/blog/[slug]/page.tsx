@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, User } from 'lucide-react';
 
 // Dynamic SEO Generation
-export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const decodedSlug = decodeURIComponent(params.slug).toLowerCase();
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug).toLowerCase();
   const blog = blogs.find(b => b.slug.toLowerCase() === decodedSlug);
   if (!blog) return { title: 'Not Found' };
   return {
@@ -29,8 +30,9 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function BlogPost({ params }: { params: { slug: string } }) {
-  const decodedSlug = decodeURIComponent(params.slug).toLowerCase();
+export default async function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug).toLowerCase();
   const blog = blogs.find(b => b.slug.toLowerCase() === decodedSlug);
   
   if (!blog) {
